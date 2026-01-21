@@ -1,0 +1,61 @@
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor/IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# Dependencies
+node_modules/
+vendor/
+.bundle/
+__pycache__/
+*.py[cod]
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+.eggs/
+*.so
+*.dylib
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+secrets.json
+credentials.json
+
+# Logs & temp
+*.log
+logs/
+tmp/
+temp/
+.cache/
+
+# Test & coverage
+coverage/
+.coverage
+htmlcov/
+.pytest_cache/
+.nyc_output/
+

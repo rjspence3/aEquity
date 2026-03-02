@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "aequity"
+version = "0.1.0"
+description = "Autonomous Equity Analyst Platform"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.84",
+    "yfinance>=1.2",
+    "sec-edgar-downloader>=5.1",
+    "pydantic>=2.12",
+    "pydantic-settings>=2.13",
+    "python-dotenv>=1.2",
+    "streamlit>=1.54",
+    "plotly>=6.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.15",
+    "mypy>=1.19",
+    "pytest>=9.0",
+    "pytest-cov>=7.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "S"]
+ignore = [
+    "S101",   # allow assert in tests
+    "B008",   # allow function calls in defaults
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S105", "S106"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
+ignore_missing_imports = true
+warn_return_any = true
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--tb=short -q"

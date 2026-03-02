@@ -1,0 +1,9 @@
+{
+  "updated": "2026-01-01",
+  "source": "S&P 500 Index (sample subset — replace with full list quarterly)",
+  "tickers": [
+    "AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "GOOG", "BRK-B", "LLY", "AVGO",
+    "TSLA", "JPM", "V", "UNH", "XOM", "MA", "PG", "COST", "HD", "JNJ",
+    "ABBV", "BAC", "MRK", "CVX", "CRM", "NFLX", "AMD", "PEP", "TMO", "ORCL"
+  ]
+}

@@ -10,30 +10,34 @@
 ## 2. System Architecture
 
 ### A. The Tech Stack
-* **Orchestrator:** CrewAI (Python)
+* **Orchestrator:** Direct Python (simple sequential pipeline, no framework)
 * **LLM Backend:**
-    * *Analysis/Synthesis:* GPT-4o or Claude 3.5 Sonnet (The "Manager").
-    * *Bulk Reading/Extraction:* GPT-4o-mini (The "Intern").
+    * *Analysis/Synthesis:* Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`)
+    * *Bulk Reading/Extraction:* Claude Haiku 4.5 (`claude-haiku-4-5-20251001`)
+    * *Provider:* Anthropic SDK (direct API calls)
 * **Data Sources:**
     * `yfinance`: Market data, basic financials.
-    * `sec-api` or `sec-edgar-downloader`: 10-K/10-Q text.
-    * *Wikipedia Scraper:* S&P 500 Constituent List.
+    * `sec-edgar-downloader`: 10-K/10-Q text.
+    * *Hardcoded JSON:* S&P 500 Constituent List (`config/sp500_tickers.json`, refreshed quarterly).
 * **Database:** SQLite (MVP) -> PostgreSQL (Production).
-* **Frontend:** Streamlit.
+* **Frontend:** Streamlit (single-page with collapsible sections).
 
-### B. The Agent Crew ("The Factory Line")
-1.  **Agent 1: The Filing Hunter (Data Engineer)**
-    * *Tools:* SEC Downloader.
-    * *Role:* Fetches the latest 10-K text. Extracts specific sections: "Risk Factors," "MD&A," "Management Letter."
-2.  **Agent 2: The Forensic Accountant (Quant)**
-    * *Tools:* `yfinance`, Calculator Tool.
-    * *Role:* Computes hard ratios (ROIC, margins, debt loads). Flags numerical anomalies.
-3.  **Agent 3: The Risk Assessor (The Skeptic)**
-    * *Tools:* None (Text Analysis).
-    * *Role:* Compares current risks vs. last year. Looks for "soft" red flags (litigation, generic corporate speak).
-4.  **Agent 4: The Virtual Committee (The Gurus)**
-    * *Tools:* Damodaran Valuation Tool.
-    * *Role:* Applies specific mental models (Buffett, Lynch, Graham) to generate a "Conviction Score."
+### B. The Analysis Pipeline (Sequential)
+1.  **Step 1: Data Fetching**
+    * Fetch latest 10-K from SEC EDGAR
+    * Extract sections: "Risk Factors" (Item 1A), "MD&A" (Item 7)
+    * Fetch financials from yfinance (income statement, balance sheet, cash flow)
+2.  **Step 2: Financial Calculations**
+    * Compute ROIC, FCF conversion, debt ratios, PEG, P/B
+    * Normalize to 0-100 scores using defined thresholds
+3.  **Step 3: LLM Analysis (Claude Sonnet)**
+    * Single API call with entire 10-K Risk + MD&A sections (leverage 200K context)
+    * Structured output using Pydantic schemas
+    * Assess moat, understandability, red flags using rubric-based prompts
+4.  **Step 4: Guru Scoring**
+    * Apply Buffett/Lynch/Graham/Damodaran formulas
+    * Generate verdicts and rationales
+    * Combine into overall score (equal weight: 25% each)
 
 ---
 

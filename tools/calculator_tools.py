@@ -45,15 +45,36 @@ def normalize_current_ratio(cr: float) -> int:
     return max(0, min(100, int((cr - 1.0) / 1.0 * 100)))
 
 
-# ── Raw calculation functions ──────────────────────────────────────────────────
+def normalize_gross_margin(gross_margin: float) -> int:
+    """
+    Gross margin → 0-100 score using domain-aware thresholds.
 
-def calculate_roic(ticker: str) -> float | None:
+    60%+ = 100 (software/luxury), 40-59% = 75 (consumer brands),
+    25-39% = 50 (industrial/healthcare), 10-24% = 25 (retail/distribution), <10% = 0.
+    """
+    if gross_margin >= 0.60:
+        return 100
+    if gross_margin >= 0.40:
+        return 75
+    if gross_margin >= 0.25:
+        return 50
+    if gross_margin >= 0.10:
+        return 25
+    return 0
+
+
+# ── Raw calculation functions ──────────────────────────────────────────────────
+#
+# All functions accept a pre-fetched yf.Ticker object rather than a ticker
+# string, so callers (primarily pipeline.analyze_ticker) can create one Ticker
+# instance and share it across all calculations without redundant HTTP fetches.
+
+def calculate_roic(stock: yf.Ticker) -> float | None:
     """
     ROIC = NOPAT / Invested Capital.
 
     Returns decimal (e.g., 0.18 for 18%) or None if data unavailable.
     """
-    stock = yf.Ticker(ticker)
     income = stock.income_stmt
     balance = stock.balance_sheet
 
@@ -79,17 +100,16 @@ def calculate_roic(ticker: str) -> float | None:
         return nopat / invested_capital
 
     except (KeyError, IndexError, ZeroDivisionError, ValueError) as exc:
-        logger.debug("ROIC calculation failed for %s: %s", ticker, exc)
+        logger.debug("ROIC calculation failed: %s", exc)
         return None
 
 
-def calculate_fcf_conversion(ticker: str) -> float | None:
+def calculate_fcf_conversion(stock: yf.Ticker) -> float | None:
     """
     FCF Conversion = Free Cash Flow / Net Income.
 
     Returns ratio or None if unavailable.
     """
-    stock = yf.Ticker(ticker)
     cashflow = stock.cashflow
     income = stock.income_stmt
 
@@ -103,17 +123,16 @@ def calculate_fcf_conversion(ticker: str) -> float | None:
         return fcf / net_income
 
     except (KeyError, IndexError, ZeroDivisionError, ValueError) as exc:
-        logger.debug("FCF conversion failed for %s: %s", ticker, exc)
+        logger.debug("FCF conversion failed: %s", exc)
         return None
 
 
-def calculate_net_debt_ebitda(ticker: str) -> float | None:
+def calculate_net_debt_ebitda(stock: yf.Ticker) -> float | None:
     """
     Net Debt / EBITDA ratio.
 
     Returns ratio (negative = net cash) or None if unavailable.
     """
-    stock = yf.Ticker(ticker)
     balance = stock.balance_sheet
     income = stock.income_stmt
 
@@ -144,39 +163,36 @@ def calculate_net_debt_ebitda(ticker: str) -> float | None:
         return net_debt / ebitda
 
     except (KeyError, IndexError, ZeroDivisionError, ValueError) as exc:
-        logger.debug("Net Debt/EBITDA failed for %s: %s", ticker, exc)
+        logger.debug("Net Debt/EBITDA failed: %s", exc)
         return None
 
 
-def calculate_peg_ratio(ticker: str) -> float | None:
+def calculate_peg_ratio(stock: yf.Ticker) -> float | None:
     """
     PEG Ratio from yfinance info dict.
 
     Returns ratio or None.
     """
     try:
-        info = yf.Ticker(ticker).info
-        peg = info.get("pegRatio")
+        peg = stock.info.get("pegRatio")
         return float(peg) if peg is not None else None
     except Exception as exc:
-        logger.debug("PEG ratio failed for %s: %s", ticker, exc)
+        logger.debug("PEG ratio failed: %s", exc)
         return None
 
 
-def calculate_price_to_book(ticker: str) -> float | None:
+def calculate_price_to_book(stock: yf.Ticker) -> float | None:
     """P/B ratio from yfinance info."""
     try:
-        info = yf.Ticker(ticker).info
-        pb = info.get("priceToBook")
+        pb = stock.info.get("priceToBook")
         return float(pb) if pb is not None else None
     except Exception as exc:
-        logger.debug("P/B ratio failed for %s: %s", ticker, exc)
+        logger.debug("P/B ratio failed: %s", exc)
         return None
 
 
-def calculate_current_ratio(ticker: str) -> float | None:
+def calculate_current_ratio(stock: yf.Ticker) -> float | None:
     """Current ratio from yfinance balance sheet."""
-    stock = yf.Ticker(ticker)
     balance = stock.balance_sheet
 
     try:
@@ -189,28 +205,34 @@ def calculate_current_ratio(ticker: str) -> float | None:
         return current_assets / current_liabilities
 
     except (KeyError, IndexError, ZeroDivisionError, ValueError) as exc:
-        logger.debug("Current ratio failed for %s: %s", ticker, exc)
+        logger.debug("Current ratio failed: %s", exc)
         return None
 
 
-def calculate_earnings_growth_5yr(ticker: str) -> float | None:
-    """5-year EPS CAGR from yfinance info (earningsGrowth as proxy)."""
+def calculate_trailing_earnings_growth(stock: yf.Ticker) -> float | None:
+    """
+    Trailing earnings growth from yfinance info (earningsGrowth field, TTM).
+
+    Note: this is trailing 12-month growth, NOT a 5-year CAGR.
+    TODO: compute true 5yr CAGR by comparing historical EPS across annual income statements.
+    Falls back to revenueGrowth if earningsGrowth is unavailable.
+    """
     try:
-        info = yf.Ticker(ticker).info
+        info = stock.info
         growth = info.get("earningsGrowth") or info.get("revenueGrowth")
         return float(growth) if growth is not None else None
     except Exception as exc:
-        logger.debug("Earnings growth failed for %s: %s", ticker, exc)
+        logger.debug("Earnings growth failed: %s", exc)
         return None
 
 
 # ── Pillar metric builders ─────────────────────────────────────────────────────
 
-def build_fortress_metrics(ticker: str) -> list[MetricDrillDown]:
+def build_fortress_metrics(stock: yf.Ticker) -> list[MetricDrillDown]:
     """Build The Fortress pillar (financial health) metrics."""
     metrics = []
 
-    roic = calculate_roic(ticker)
+    roic = calculate_roic(stock)
     if roic is not None:
         metrics.append(MetricDrillDown(
             metric_name="ROIC",
@@ -221,7 +243,7 @@ def build_fortress_metrics(ticker: str) -> list[MetricDrillDown]:
             confidence="high",
         ))
 
-    fcf = calculate_fcf_conversion(ticker)
+    fcf = calculate_fcf_conversion(stock)
     if fcf is not None:
         metrics.append(MetricDrillDown(
             metric_name="FCF Conversion",
@@ -232,7 +254,7 @@ def build_fortress_metrics(ticker: str) -> list[MetricDrillDown]:
             confidence="high",
         ))
 
-    nd_ebitda = calculate_net_debt_ebitda(ticker)
+    nd_ebitda = calculate_net_debt_ebitda(stock)
     if nd_ebitda is not None:
         metrics.append(MetricDrillDown(
             metric_name="Net Debt / EBITDA",
@@ -246,11 +268,11 @@ def build_fortress_metrics(ticker: str) -> list[MetricDrillDown]:
     return metrics
 
 
-def build_engine_metrics(ticker: str) -> list[MetricDrillDown]:
+def build_engine_metrics(stock: yf.Ticker) -> list[MetricDrillDown]:
     """Build The Engine pillar (business quality) metrics."""
     metrics = []
 
-    roic = calculate_roic(ticker)
+    roic = calculate_roic(stock)
     if roic is not None:
         metrics.append(MetricDrillDown(
             metric_name="ROIC",
@@ -262,10 +284,9 @@ def build_engine_metrics(ticker: str) -> list[MetricDrillDown]:
         ))
 
     try:
-        info = yf.Ticker(ticker).info
-        gross_margins = info.get("grossMargins")
+        gross_margins = stock.info.get("grossMargins")
         if gross_margins is not None:
-            score = max(0, min(100, int(float(gross_margins) * 100)))
+            score = normalize_gross_margin(float(gross_margins))
             metrics.append(MetricDrillDown(
                 metric_name="Gross Margin",
                 raw_value=round(float(gross_margins) * 100, 2),
@@ -275,17 +296,17 @@ def build_engine_metrics(ticker: str) -> list[MetricDrillDown]:
                 confidence="high",
             ))
     except Exception as exc:
-        logger.debug("Gross margin failed for %s: %s", ticker, exc)
+        logger.debug("Gross margin failed: %s", exc)
 
     return metrics
 
 
-def build_alignment_metrics(ticker: str) -> list[MetricDrillDown]:
+def build_alignment_metrics(stock: yf.Ticker) -> list[MetricDrillDown]:
     """Build the Alignment pillar (governance) metrics."""
     metrics = []
 
     try:
-        info = yf.Ticker(ticker).info
+        info = stock.info
 
         insider_pct = info.get("heldPercentInsiders")
         if insider_pct is not None:
@@ -299,9 +320,10 @@ def build_alignment_metrics(ticker: str) -> list[MetricDrillDown]:
                 confidence="medium",
             ))
 
-        dividend_yield = info.get("dividendYield") or 0.0
-        buyback_yield = info.get("buybackYield") or 0.0
-        shareholder_yield = float(dividend_yield) + float(buyback_yield)
+        dividend_yield = float(info.get("dividendYield") or 0.0)
+        # yfinance does not provide buyback yield directly; shareholder yield is dividend-only.
+        # TODO: derive buyback yield from repurchaseOfStock in the cashflow statement.
+        shareholder_yield = dividend_yield
         if shareholder_yield > 0:
             score = max(0, min(100, int(shareholder_yield * 1000)))
             metrics.append(MetricDrillDown(
@@ -309,11 +331,11 @@ def build_alignment_metrics(ticker: str) -> list[MetricDrillDown]:
                 raw_value=round(shareholder_yield * 100, 2),
                 normalized_score=score,
                 source="yfinance",
-                evidence=f"Dividend + buyback yield = {shareholder_yield * 100:.2f}%",
+                evidence=f"Dividend yield = {shareholder_yield * 100:.2f}% (buyback yield unavailable from yfinance)",
                 confidence="medium",
             ))
 
     except Exception as exc:
-        logger.debug("Alignment metrics failed for %s: %s", ticker, exc)
+        logger.debug("Alignment metrics failed: %s", exc)
 
     return metrics

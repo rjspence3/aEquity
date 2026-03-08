@@ -1,5 +1,11 @@
 # Plan.md: The Autonomous Equity Analyst Platform
 
+> **Note (2026-03-05):** Sections 11 and 12 (Model Selection, CrewAI Configuration,
+> and Environment Variables) reflect the original design and are **superseded**.
+> The implementation uses Claude Haiku 4.5 and Claude Sonnet 4.5 via the Anthropic
+> SDK directly (no CrewAI, no OpenAI). See `config.py` and `pipeline.py` for the
+> current model configuration.
+
 ## 1. Executive Summary
 **Goal:** Build an agentic system that autonomously fetches financial data (10-Ks, Transcripts, Market Data) for the S&P 500, analyzes it using a "Virtual Investment Committee" of legendary investors (Buffett, Lynch, etc.), and presents the findings in a structured, clickable dashboard.
 

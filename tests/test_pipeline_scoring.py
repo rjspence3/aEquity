@@ -12,6 +12,10 @@ from pipeline import (
     _score_graham,
     _score_lynch,
     _score_to_verdict,
+    _weighted_score,
+    _ENGINE_WEIGHTS,
+    _FORTRESS_WEIGHTS,
+    _ALIGNMENT_WEIGHTS,
 )
 
 
@@ -128,7 +132,20 @@ class TestScoreToVerdict:
         assert _score_to_verdict(79) == "Buy"
 
 
+def _named_metric(name: str, score: int) -> MetricDrillDown:
+    return MetricDrillDown(
+        metric_name=name,
+        raw_value=float(score),
+        normalized_score=score,
+        source="calculated",
+        evidence="test",
+        confidence="high",
+    )
+
+
 class TestPillarScoreAggregation:
+    # ── Backward-compat: unknown metric names fall back to equal weighting ──
+
     def test_empty_metrics_returns_50(self):
         assert _score_engine([]) == 50
         assert _score_fortress([]) == 50
@@ -146,3 +163,43 @@ class TestPillarScoreAggregation:
 
     def test_all_hundreds(self):
         assert _score_engine([_metric(100), _metric(100)]) == 100
+
+    # ── Named weights are applied for known metric names ────────────────────
+
+    def test_engine_roic_weighted_more_than_gross_margin(self):
+        # ROIC=100, Gross Margin=0 → should be closer to 60 than 50
+        result = _score_engine([
+            _named_metric("ROIC", 100),
+            _named_metric("Gross Margin", 0),
+        ])
+        assert result == 60  # 0.60*100 + 0.40*0 = 60
+
+    def test_fortress_missing_metric_renormalises_weights(self):
+        # Only FCF Conversion present; its weight (0.40) renormalises to 1.0
+        result = _score_fortress([_named_metric("FCF Conversion", 80)])
+        assert result == 80
+
+    def test_alignment_equal_weights(self):
+        result = _score_alignment([
+            _named_metric("Insider Ownership", 100),
+            _named_metric("Shareholder Yield", 0),
+        ])
+        assert result == 50  # 0.50*100 + 0.50*0 = 50
+
+    def test_weighted_score_unknown_name_equal_fallback(self):
+        # Two unknown-name metrics should still average equally
+        result = _weighted_score(
+            [_named_metric("Unknown A", 40), _named_metric("Unknown B", 80)],
+            _ENGINE_WEIGHTS,
+        )
+        assert result == 60
+
+    def test_weight_dicts_cover_all_builder_metrics(self):
+        # Catch any future rename in calculator_tools.py
+        assert "ROIC" in _ENGINE_WEIGHTS
+        assert "Gross Margin" in _ENGINE_WEIGHTS
+        assert "FCF Conversion" in _FORTRESS_WEIGHTS
+        assert "Net Debt / EBITDA" in _FORTRESS_WEIGHTS
+        assert "ROIC" in _FORTRESS_WEIGHTS
+        assert "Insider Ownership" in _ALIGNMENT_WEIGHTS
+        assert "Shareholder Yield" in _ALIGNMENT_WEIGHTS

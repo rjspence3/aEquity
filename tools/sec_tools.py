@@ -1,5 +1,6 @@
 """SEC EDGAR filing fetcher and section extractor."""
 
+import html
 import logging
 import re
 import time
@@ -15,9 +16,13 @@ _RISK_FACTORS_PATTERN = re.compile(
     re.DOTALL | re.IGNORECASE,
 )
 
-# Matches Item 7 MD&A through Item 7A / Item 8
+# Matches Item 7 MD&A through Item 7A / Item 8.
+# The full "Management ... Discussion and Analysis" sequence is required explicitly
+# (rather than optional as in the old pattern) to eliminate the double-non-greedy
+# ambiguity where two consecutive .*? groups could both match empty strings.
+# No \n requirement — _strip_html_tags collapses all whitespace to single spaces.
 _MDNA_PATTERN = re.compile(
-    r"(?:Item\s*7[\.\s]*(?:Management['\u2019]?s\s*Discussion)?.*?)(.*?)(?=Item\s*7A|Item\s*8)",
+    r"Item\s+7\.?\s+Management['\u2019]?s?\s+Discussion\s+and\s+Analysis\b(.*?)(?=\bItem\s+7A\b|\bItem\s+8\b)",
     re.DOTALL | re.IGNORECASE,
 )
 
@@ -26,12 +31,10 @@ _MAX_SECTION_CHARS = 200_000  # ~50k tokens — stays within Sonnet's 200k conte
 
 
 def _strip_html_tags(text: str) -> str:
-    """Remove HTML tags, collapse whitespace."""
+    """Remove HTML tags, decode all HTML entities, collapse whitespace."""
     text = re.sub(r"<[^>]+>", " ", text)
-    text = re.sub(r"&nbsp;", " ", text)
-    text = re.sub(r"&amp;", "&", text)
-    text = re.sub(r"&lt;", "<", text)
-    text = re.sub(r"&gt;", ">", text)
+    text = html.unescape(text)
+    text = text.replace("\xa0", " ")  # non-breaking space (&nbsp;) → regular space
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
@@ -85,7 +88,12 @@ def fetch_10k_sections(
         return {"risk_factors": None, "mdna": None, "filing_date": None}
 
     latest = subdirs[0]
-    filing_date = latest.name[:10] if len(latest.name) >= 10 else None
+    date_match = re.match(r"(\d{4}-\d{2}-\d{2})", latest.name)
+    if date_match:
+        filing_date = date_match.group(1)
+    else:
+        logger.warning("Could not parse filing date from directory name: %s", latest.name)
+        filing_date = None
 
     # Find the primary document (prefer .htm/.html, fall back to any text)
     filing_text = ""
@@ -106,8 +114,20 @@ def fetch_10k_sections(
 
     clean_text = _strip_html_tags(filing_text)
 
+    mdna = _extract_section(clean_text, _MDNA_PATTERN)
+    # 1 000-char threshold distinguishes real narrative from table-of-contents
+    # extractions (which typically run 200-400 chars). Full 10-K MD&A sections
+    # are rarely under 2 000 words; anything shorter is almost certainly a TOC hit.
+    if mdna is not None and len(mdna) < 1000:
+        logger.warning(
+            "MD&A extraction for %s appears to be a TOC match, not narrative "
+            "(%d chars); ignoring",
+            ticker, len(mdna),
+        )
+        mdna = None
+
     return {
         "risk_factors": _extract_section(clean_text, _RISK_FACTORS_PATTERN),
-        "mdna": _extract_section(clean_text, _MDNA_PATTERN),
+        "mdna": mdna,
         "filing_date": filing_date,
     }

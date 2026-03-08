@@ -21,7 +21,7 @@ from tools.calculator_tools import (
     build_engine_metrics,
     build_fortress_metrics,
     calculate_current_ratio,
-    calculate_earnings_growth_5yr,
+    calculate_trailing_earnings_growth,
     calculate_fcf_conversion,
     calculate_net_debt_ebitda,
     calculate_peg_ratio,
@@ -140,10 +140,9 @@ Scoring criteria:
     raw = _call_claude(client, _HAIKU, system_prompt, user_prompt, max_tokens=1024)
 
     try:
-        # Extract JSON if wrapped in markdown
         json_match = raw.strip()
         if "```" in json_match:
-            json_match = json_match.split("```")[1].lstrip("json").strip()
+            json_match = json_match.split("```")[1].removeprefix("json").strip()
         return cast(dict[str, object], json.loads(json_match))
     except (json.JSONDecodeError, IndexError) as exc:
         logger.warning("Failed to parse moat assessment JSON: %s — raw: %s", exc, raw[:200])
@@ -200,7 +199,7 @@ company that way. Reference specific metrics. Return exactly this JSON (no markd
     try:
         json_str = raw.strip()
         if "```" in json_str:
-            json_str = json_str.split("```")[1].lstrip("json").strip()
+            json_str = json_str.split("```")[1].removeprefix("json").strip()
         return cast(dict[str, str], json.loads(json_str))
     except (json.JSONDecodeError, IndexError) as exc:
         logger.warning("Failed to parse guru rationales JSON: %s", exc)
@@ -249,7 +248,7 @@ Return exactly this JSON (no markdown):
     try:
         json_str = raw.strip()
         if "```" in json_str:
-            json_str = json_str.split("```")[1].lstrip("json").strip()
+            json_str = json_str.split("```")[1].removeprefix("json").strip()
         return cast(dict[str, str], json.loads(json_str))
     except (json.JSONDecodeError, IndexError) as exc:
         logger.warning("Failed to parse pillar summaries JSON: %s", exc)
@@ -289,7 +288,6 @@ def _score_lynch(
     if peg is not None:
         components.append((0.40, normalize_peg(peg)))
     if earnings_growth is not None:
-        # 15%+ = 100, 0% = 0
         growth_score = max(0, min(100, int(earnings_growth / 0.15 * 100)))
         components.append((0.30, growth_score))
     components.append((0.30, understandability))
@@ -312,7 +310,6 @@ def _score_graham(
     if current_ratio is not None:
         components.append((0.35, normalize_current_ratio(current_ratio)))
     if earnings_growth is not None:
-        # Positive earnings stability: > 0 growth = 100, negative = 0
         stability = 100 if earnings_growth > 0 else 0
         components.append((0.30, stability))
 
@@ -328,15 +325,17 @@ def _score_damodaran(
     peg: float | None,
     nd_ebitda: float | None,
 ) -> int:
-    """Simplified Damodaran score (DCF margin of safety requires price target; use proxies)."""
+    """
+    Proxy Damodaran score using ROIC, PEG, and leverage as valuation inputs.
+    A full reverse-DCF requires a price target; this approximation is intentional
+    for the MVP and flagged as Phase 3 work in docs/Plan.md.
+    """
     components = []
     if roic is not None:
         components.append((0.50, normalize_roic(roic)))
     if peg is not None:
-        # Growth sustainability proxy
         components.append((0.30, normalize_peg(peg)))
     if nd_ebitda is not None:
-        # Risk-adjusted proxy
         components.append((0.20, normalize_debt_ratio(nd_ebitda)))
 
     if not components:
@@ -356,6 +355,66 @@ def _score_to_verdict(score: int) -> str:
     if score >= 30:
         return "Avoid"
     return "Strong Avoid"
+
+
+# ── Pillar score aggregation ──────────────────────────────────────────────────
+
+# Explicit weights per pillar. Weights need not sum to 1.0 — they are normalised
+# against whichever metrics are actually present, so missing data degrades
+# gracefully rather than silently shifting the score toward 50.
+_ENGINE_WEIGHTS: dict[str, float] = {
+    "ROIC": 0.60,
+    "Gross Margin": 0.40,
+}
+
+_FORTRESS_WEIGHTS: dict[str, float] = {
+    "FCF Conversion": 0.40,
+    "Net Debt / EBITDA": 0.40,
+    "ROIC": 0.20,
+}
+
+_ALIGNMENT_WEIGHTS: dict[str, float] = {
+    "Insider Ownership": 0.50,
+    "Shareholder Yield": 0.50,
+}
+
+
+def _weighted_score(metrics: list[MetricDrillDown], weights: dict[str, float]) -> int:
+    """
+    Weighted average of metric scores.
+
+    Unknown metric names fall back to equal weighting (1 / len(metrics)) so that
+    test fixtures and future metrics degrade gracefully rather than being silently
+    excluded.
+    """
+    if not metrics:
+        return 50
+
+    equal_fallback = 1.0 / len(metrics)
+    total_weight = 0.0
+    weighted_sum = 0.0
+
+    for m in metrics:
+        w = weights.get(m.metric_name, equal_fallback)
+        weighted_sum += w * m.normalized_score
+        total_weight += w
+
+    if total_weight == 0:
+        return 50
+
+    return int(weighted_sum / total_weight)
+
+
+def _score_engine(metrics: list[MetricDrillDown]) -> int:
+    return _weighted_score(metrics, _ENGINE_WEIGHTS)
+
+
+def _score_fortress(metrics: list[MetricDrillDown]) -> int:
+    return _weighted_score(metrics, _FORTRESS_WEIGHTS)
+
+
+def _score_alignment(metrics: list[MetricDrillDown]) -> int:
+    return _weighted_score(metrics, _ALIGNMENT_WEIGHTS)
 
 
 # ── Main pipeline ──────────────────────────────────────────────────────────────
@@ -395,17 +454,17 @@ def analyze_ticker(ticker: str) -> CompanyAnalysis:
 
     # ── Step 3: Calculate quantitative metrics ─────────────────────────────────
     logger.info("Calculating quantitative metrics for %s", ticker)
-    roic = calculate_roic(ticker)
-    fcf_conv = calculate_fcf_conversion(ticker)
-    nd_ebitda = calculate_net_debt_ebitda(ticker)
-    peg = calculate_peg_ratio(ticker)
-    pb = calculate_price_to_book(ticker)
-    current_ratio = calculate_current_ratio(ticker)
-    earnings_growth = calculate_earnings_growth_5yr(ticker)
+    roic = calculate_roic(stock)
+    fcf_conv = calculate_fcf_conversion(stock)
+    nd_ebitda = calculate_net_debt_ebitda(stock)
+    peg = calculate_peg_ratio(stock)
+    pb = calculate_price_to_book(stock)
+    current_ratio = calculate_current_ratio(stock)
+    earnings_growth = calculate_trailing_earnings_growth(stock)
 
-    fortress_metrics = build_fortress_metrics(ticker)
-    engine_metrics = build_engine_metrics(ticker)
-    alignment_metrics = build_alignment_metrics(ticker)
+    fortress_metrics = build_fortress_metrics(stock)
+    engine_metrics = build_engine_metrics(stock)
+    alignment_metrics = build_alignment_metrics(stock)
 
     # ── Step 4: LLM qualitative assessment ────────────────────────────────────
     logger.info("Running LLM qualitative assessment for %s", ticker)
@@ -487,7 +546,82 @@ def analyze_ticker(ticker: str) -> CompanyAnalysis:
 
     # ── Step 7: Assemble CompanyAnalysis ──────────────────────────────────────
 
-    # Build guru scorecards
+    # Build guru key metrics directly from raw calculated values.
+    # Constructing them here (rather than filtering the pillar metric lists by name)
+    # keeps guru metrics independent of pillar structure.
+    buffett_key_metrics: list[MetricDrillDown] = []
+    if roic is not None:
+        buffett_key_metrics.append(MetricDrillDown(
+            metric_name="ROIC",
+            raw_value=round(roic * 100, 2),
+            normalized_score=normalize_roic(roic),
+            source="calculated",
+            evidence=f"ROIC = {roic * 100:.1f}%",
+            confidence="high",
+        ))
+    if fcf_conv is not None:
+        buffett_key_metrics.append(MetricDrillDown(
+            metric_name="FCF Conversion",
+            raw_value=round(fcf_conv, 3),
+            normalized_score=normalize_fcf_conversion(fcf_conv),
+            source="calculated",
+            evidence=f"FCF / Net Income = {fcf_conv:.2f}x",
+            confidence="high",
+        ))
+    buffett_key_metrics.append(moat_metric)
+
+    lynch_key_metrics: list[MetricDrillDown] = []
+    if peg is not None:
+        lynch_key_metrics.append(MetricDrillDown(
+            metric_name="PEG Ratio",
+            raw_value=peg,
+            normalized_score=normalize_peg(peg),
+            source="yfinance",
+            evidence=f"PEG = {peg:.2f}",
+            confidence="medium",
+        ))
+    lynch_key_metrics.append(understandability_metric)
+
+    graham_key_metrics: list[MetricDrillDown] = []
+    if pb is not None:
+        graham_key_metrics.append(MetricDrillDown(
+            metric_name="Price/Book",
+            raw_value=pb,
+            normalized_score=normalize_price_to_book(pb),
+            source="yfinance",
+            evidence=f"P/B = {pb:.2f}",
+            confidence="high",
+        ))
+    if current_ratio is not None:
+        graham_key_metrics.append(MetricDrillDown(
+            metric_name="Current Ratio",
+            raw_value=current_ratio,
+            normalized_score=normalize_current_ratio(current_ratio),
+            source="calculated",
+            evidence=f"Current Ratio = {current_ratio:.2f}",
+            confidence="high",
+        ))
+
+    damodaran_key_metrics: list[MetricDrillDown] = []
+    if roic is not None:
+        damodaran_key_metrics.append(MetricDrillDown(
+            metric_name="ROIC",
+            raw_value=round(roic * 100, 2),
+            normalized_score=normalize_roic(roic),
+            source="calculated",
+            evidence=f"ROIC = {roic * 100:.1f}%",
+            confidence="high",
+        ))
+    if peg is not None:
+        damodaran_key_metrics.append(MetricDrillDown(
+            metric_name="PEG Ratio",
+            raw_value=peg,
+            normalized_score=normalize_peg(peg),
+            source="yfinance",
+            evidence=f"PEG = {peg:.2f}",
+            confidence="medium",
+        ))
+
     def _build_guru_scorecard(
         name: str, score: int, key_metrics: list[MetricDrillDown]
     ) -> GuruScorecard:
@@ -499,39 +633,13 @@ def analyze_ticker(ticker: str) -> CompanyAnalysis:
             key_metrics=key_metrics,
         )
 
-    buffett_metrics = [m for m in fortress_metrics if m.metric_name in ("ROIC", "FCF Conversion")]
-    buffett_metrics.append(moat_metric)
-    lynch_metrics = []
-    if peg is not None:
-        lynch_metrics.append(MetricDrillDown(
-            metric_name="PEG Ratio",
-            raw_value=peg,
-            normalized_score=normalize_peg(peg),
-            source="yfinance",
-            evidence=f"PEG = {peg:.2f} (from yfinance info)",
-            confidence="medium",
-        ))
-    lynch_metrics.append(understandability_metric)
-    graham_metrics = []
-    if pb is not None:
-        graham_metrics.append(MetricDrillDown(
-            metric_name="Price/Book",
-            raw_value=pb,
-            normalized_score=normalize_price_to_book(pb),
-            source="yfinance",
-            evidence=f"P/B = {pb:.2f}",
-            confidence="high",
-        ))
-    damodaran_metrics = [m for m in fortress_metrics if m.metric_name == "ROIC"]
-
     gurus = [
-        _build_guru_scorecard("Warren Buffett", buffett_score, buffett_metrics),
-        _build_guru_scorecard("Peter Lynch", lynch_score, lynch_metrics),
-        _build_guru_scorecard("Ben Graham", graham_score, graham_metrics),
-        _build_guru_scorecard("Aswath Damodaran", damodaran_score, damodaran_metrics),
+        _build_guru_scorecard("Warren Buffett", buffett_score, buffett_key_metrics),
+        _build_guru_scorecard("Peter Lynch", lynch_score, lynch_key_metrics),
+        _build_guru_scorecard("Ben Graham", graham_score, graham_key_metrics),
+        _build_guru_scorecard("Aswath Damodaran", damodaran_score, damodaran_key_metrics),
     ]
 
-    # Build pillar analyses
     pillars = [
         PillarAnalysis(
             pillar_name="The Engine",
@@ -564,7 +672,7 @@ def analyze_ticker(ticker: str) -> CompanyAnalysis:
     ]
 
     confidence: str = "high" if not partial else "medium"
-    if not roic and not peg:
+    if roic is None and peg is None:
         confidence = "low"
 
     return CompanyAnalysis(
@@ -580,23 +688,3 @@ def analyze_ticker(ticker: str) -> CompanyAnalysis:
         errors=errors,
         partial=partial,
     )
-
-
-# ── Score aggregation helpers ─────────────────────────────────────────────────
-
-def _score_engine(metrics: list[MetricDrillDown]) -> int:
-    if not metrics:
-        return 50
-    return int(sum(m.normalized_score for m in metrics) / len(metrics))
-
-
-def _score_fortress(metrics: list[MetricDrillDown]) -> int:
-    if not metrics:
-        return 50
-    return int(sum(m.normalized_score for m in metrics) / len(metrics))
-
-
-def _score_alignment(metrics: list[MetricDrillDown]) -> int:
-    if not metrics:
-        return 50
-    return int(sum(m.normalized_score for m in metrics) / len(metrics))

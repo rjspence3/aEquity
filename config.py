@@ -23,10 +23,8 @@ class RedactingFormatter(logging.Formatter):
 
 class Settings(BaseSettings):
     anthropic_api_key: str = ""
-    sec_api_key: str = ""
+    sec_user_agent_email: str = ""
     database_url: str = "sqlite:///./db/aequity.db"
-    sec_requests_per_second: int = 10
-    llm_max_retries: int = 3
     log_level: str = "INFO"
 
     model_config = {"env_file": ".env", "extra": "ignore"}

@@ -6,7 +6,6 @@ import pytest
 from pydantic import ValidationError
 
 from models import (
-    AnalysisError,
     CompanyAnalysis,
     GuruScorecard,
     MetricDrillDown,
@@ -176,19 +175,3 @@ class TestCompanyAnalysis:
             )
 
 
-class TestAnalysisError:
-    def test_valid_error(self):
-        err = AnalysisError(
-            ticker="AAPL",
-            error_type="rate_limit",
-            message="429 Too Many Requests",
-        )
-        assert err.partial_result is None
-
-    def test_invalid_error_type_raises(self):
-        with pytest.raises(ValidationError):
-            AnalysisError(
-                ticker="AAPL",
-                error_type="network_error",  # not in Literal
-                message="test",
-            )

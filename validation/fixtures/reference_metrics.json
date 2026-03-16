@@ -1,0 +1,122 @@
+{
+  "AAPL": {
+    "roic_pct": 54.0,
+    "fcf_conversion": 1.08,
+    "net_debt_ebitda": -0.5,
+    "peg_ratio": 2.8,
+    "price_to_book": 48.0,
+    "current_ratio": 0.87,
+    "gross_margin_pct": 46.5,
+    "source": "Macrotrends/yfinance TTM as of 2025-Q3",
+    "notes": "AAPL current ratio < 1 is intentional (negative working capital strategy)",
+    "verified": true
+  },
+  "MSFT": {
+    "roic_pct": 28.0,
+    "fcf_conversion": 1.15,
+    "net_debt_ebitda": -1.2,
+    "peg_ratio": 2.4,
+    "price_to_book": 13.0,
+    "current_ratio": 1.30,
+    "gross_margin_pct": 70.0,
+    "source": "Macrotrends/yfinance TTM as of 2025-Q3",
+    "notes": "Net cash position; cloud margins drive high gross margin",
+    "verified": true
+  },
+  "JNJ": {
+    "roic_pct": 14.0,
+    "fcf_conversion": 0.95,
+    "net_debt_ebitda": 0.8,
+    "peg_ratio": 2.2,
+    "price_to_book": 5.5,
+    "current_ratio": 1.15,
+    "gross_margin_pct": 68.0,
+    "source": "Macrotrends/yfinance TTM as of 2025-Q3",
+    "notes": "Post-Kenvue spin-off, pharma-focused",
+    "verified": true
+  },
+  "COST": {
+    "roic_pct": 18.0,
+    "fcf_conversion": 0.88,
+    "net_debt_ebitda": 0.3,
+    "peg_ratio": 4.5,
+    "price_to_book": 14.0,
+    "current_ratio": 1.02,
+    "gross_margin_pct": 13.0,
+    "source": "Macrotrends/yfinance TTM as of 2025-Q3",
+    "notes": "Intentionally low gross margin — membership fee model; high PEG reflects premium valuation",
+    "verified": true
+  },
+  "PG": {
+    "roic_pct": 13.0,
+    "fcf_conversion": 1.05,
+    "net_debt_ebitda": 1.2,
+    "peg_ratio": 3.8,
+    "price_to_book": 7.8,
+    "current_ratio": 0.72,
+    "gross_margin_pct": 51.0,
+    "source": "Macrotrends/yfinance TTM as of 2025-Q3",
+    "notes": "Current ratio < 1 is normal for P&G — strong FCF covers obligations",
+    "verified": true
+  },
+  "SPG": {
+    "roic_pct": null,
+    "fcf_conversion": 0.70,
+    "net_debt_ebitda": 6.5,
+    "peg_ratio": null,
+    "price_to_book": 14.0,
+    "current_ratio": null,
+    "gross_margin_pct": 62.0,
+    "source": "Macrotrends/yfinance TTM as of 2025-Q3",
+    "notes": "REIT — ROIC not meaningful; current ratio not applicable; high leverage is normal for REITs",
+    "verified": true
+  },
+  "JPM": {
+    "roic_pct": null,
+    "fcf_conversion": null,
+    "net_debt_ebitda": null,
+    "peg_ratio": 2.0,
+    "price_to_book": 1.9,
+    "current_ratio": null,
+    "gross_margin_pct": null,
+    "source": "Macrotrends/yfinance TTM as of 2025-Q3",
+    "notes": "Bank — ROIC, FCF conversion, net debt/EBITDA, current ratio all inapplicable for financial institutions",
+    "verified": true
+  },
+  "UBER": {
+    "roic_pct": null,
+    "fcf_conversion": null,
+    "net_debt_ebitda": 2.8,
+    "peg_ratio": 1.5,
+    "price_to_book": 17.0,
+    "current_ratio": 1.22,
+    "gross_margin_pct": 39.0,
+    "source": "Macrotrends/yfinance TTM as of 2025-Q3",
+    "notes": "Recent profitability; ROIC not meaningful historically; FCF conversion unreliable with recent transition",
+    "verified": false
+  },
+  "T": {
+    "roic_pct": 4.5,
+    "fcf_conversion": 0.72,
+    "net_debt_ebitda": 3.0,
+    "peg_ratio": null,
+    "price_to_book": 1.1,
+    "current_ratio": 0.55,
+    "gross_margin_pct": 58.0,
+    "source": "Macrotrends/yfinance TTM as of 2025-Q3",
+    "notes": "Highly leveraged post-DirecTV/WarnerMedia; PEG not meaningful; current ratio reflects large current debt",
+    "verified": true
+  },
+  "PLTR": {
+    "roic_pct": 5.0,
+    "fcf_conversion": 1.40,
+    "net_debt_ebitda": -4.0,
+    "peg_ratio": 3.5,
+    "price_to_book": 28.0,
+    "current_ratio": 5.60,
+    "gross_margin_pct": 81.0,
+    "source": "Macrotrends/yfinance TTM as of 2025-Q3",
+    "notes": "Net cash; high SBC distorts reported income; FCF conversion looks high vs GAAP net income but adjusted FCF excludes SBC",
+    "verified": false
+  }
+}

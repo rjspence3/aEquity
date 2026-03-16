@@ -50,7 +50,6 @@ def _extract_section(text: str, pattern: re.Pattern) -> str | None:
 
 def fetch_10k_sections(
     ticker: str,
-    user_agent_email: str = "research@aequity.local",
     max_retries: int = 3,
 ) -> dict[str, str | None]:
     """
@@ -58,8 +57,20 @@ def fetch_10k_sections(
 
     Returns a dict with keys 'risk_factors' and 'mdna', values are extracted
     text strings or None if the section could not be found.
+
+    Requires SEC_USER_AGENT_EMAIL to be set in settings (EDGAR terms of service).
     """
-    downloader = Downloader("aEquity", user_agent_email, _DOWNLOAD_DIR)
+    from config import settings  # local import to avoid circular dependency at module load
+
+    email = settings.sec_user_agent_email
+    if not email:
+        raise ValueError(
+            "SEC_USER_AGENT_EMAIL is not set. "
+            "EDGAR requires a real contact email in the User-Agent header. "
+            "Add SEC_USER_AGENT_EMAIL=your-email@example.com to your .env file."
+        )
+
+    downloader = Downloader("aEquity", email, _DOWNLOAD_DIR)
 
     for attempt in range(1, max_retries + 1):
         try:

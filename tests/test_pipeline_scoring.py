@@ -13,10 +13,10 @@ from pipeline import (
     _score_lynch,
     _score_to_verdict,
     _weighted_score,
-    _ENGINE_WEIGHTS,
-    _FORTRESS_WEIGHTS,
-    _ALIGNMENT_WEIGHTS,
 )
+from scoring_config import ALIGNMENT_WEIGHTS as _ALIGNMENT_WEIGHTS
+from scoring_config import ENGINE_WEIGHTS as _ENGINE_WEIGHTS
+from scoring_config import FORTRESS_WEIGHTS as _FORTRESS_WEIGHTS
 
 
 def _metric(score: int) -> MetricDrillDown:

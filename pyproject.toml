@@ -26,6 +26,10 @@ dev = [
     "pytest>=9.0",
     "pytest-cov>=7.0",
 ]
+validation = [
+    "matplotlib>=3.8",
+    "scipy>=1.12",
+]
 
 [tool.ruff]
 line-length = 100

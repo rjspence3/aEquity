@@ -1,17 +1,52 @@
 """CLI entry point for single-stock analysis."""
 
+import argparse
 import json
+import logging
 import sys
+
+import anthropic
 
 from pipeline import analyze_ticker
 
+logger = logging.getLogger(__name__)
+
 
 def main() -> None:
-    ticker = sys.argv[1].strip().upper() if len(sys.argv) > 1 else "AAPL"
+    parser = argparse.ArgumentParser(
+        description="aEquity — run guru-style analysis on a single stock ticker."
+    )
+    parser.add_argument(
+        "ticker",
+        nargs="?",
+        default="AAPL",
+        help="Stock ticker symbol (default: AAPL)",
+    )
+    args = parser.parse_args()
+    ticker = args.ticker.strip().upper()
 
     print(f"\nRunning analysis for {ticker}...\n")
 
-    result = analyze_ticker(ticker)
+    try:
+        result = analyze_ticker(ticker)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+    except anthropic.AuthenticationError:
+        print(
+            "Error: Anthropic API key is missing or invalid.\n"
+            "Set ANTHROPIC_API_KEY in your .env file or environment.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    except Exception as exc:
+        logger.error("Unexpected error during analysis of %s: %s", ticker, exc, exc_info=True)
+        print(
+            f"Error: Unexpected failure analyzing {ticker}.\n"
+            "Run with LOG_LEVEL=DEBUG for details.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     print(f"{'=' * 60}")
     print(f"  {result.company_name} ({result.ticker})")
@@ -42,7 +77,6 @@ def main() -> None:
         for err in result.errors:
             print(f"  ⚠  {err}")
 
-    # Write JSON output to file
     output_path = f"output_{ticker}.json"
     with open(output_path, "w") as f:
         json.dump(result.model_dump(mode="json"), f, indent=2, default=str)

@@ -5,6 +5,7 @@ from tools.calculator_tools import (
     normalize_current_ratio,
     normalize_debt_ratio,
     normalize_fcf_conversion,
+    normalize_gross_margin,
     normalize_peg,
     normalize_price_to_book,
     normalize_roic,
@@ -100,3 +101,35 @@ class TestNormalizeCurrentRatio:
     def test_midpoint(self):
         score = normalize_current_ratio(1.5)
         assert 45 <= score <= 55
+
+
+class TestNormalizeGrossMargin:
+    def test_at_60_percent_returns_100(self):
+        assert normalize_gross_margin(0.60) == 100
+
+    def test_above_60_percent_returns_100(self):
+        assert normalize_gross_margin(0.85) == 100
+
+    def test_just_below_60_percent_returns_75(self):
+        assert normalize_gross_margin(0.59) == 75
+
+    def test_at_40_percent_returns_75(self):
+        assert normalize_gross_margin(0.40) == 75
+
+    def test_just_below_40_percent_returns_50(self):
+        assert normalize_gross_margin(0.39) == 50
+
+    def test_at_25_percent_returns_50(self):
+        assert normalize_gross_margin(0.25) == 50
+
+    def test_just_below_25_percent_returns_25(self):
+        assert normalize_gross_margin(0.24) == 25
+
+    def test_at_10_percent_returns_25(self):
+        assert normalize_gross_margin(0.10) == 25
+
+    def test_just_below_10_percent_returns_0(self):
+        assert normalize_gross_margin(0.09) == 0
+
+    def test_zero_returns_0(self):
+        assert normalize_gross_margin(0.0) == 0

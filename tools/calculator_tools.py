@@ -5,6 +5,24 @@ import logging
 import yfinance as yf
 
 from models import MetricDrillDown
+from scoring_config import (
+    CURRENT_RATIO_LOWER,
+    CURRENT_RATIO_UPPER,
+    DEBT_LOWER,
+    DEBT_UPPER,
+    FCF_LOWER,
+    FCF_UPPER,
+    GROSS_MARGIN_TIER_HIGH,
+    GROSS_MARGIN_TIER_LOW,
+    GROSS_MARGIN_TIER_MID,
+    GROSS_MARGIN_TIER_MID_HIGH,
+    PB_LOWER,
+    PB_UPPER,
+    PEG_LOWER,
+    PEG_UPPER,
+    ROIC_LOWER,
+    ROIC_UPPER,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -12,53 +30,60 @@ logger = logging.getLogger(__name__)
 # ── Normalization helpers ──────────────────────────────────────────────────────
 
 def normalize_roic(roic: float) -> int:
-    """ROIC > 20% = 100, < 5% = 0, linear interpolation between."""
-    return max(0, min(100, int((roic - 0.05) / 0.15 * 100)))
+    """ROIC >= ROIC_UPPER = 100, <= ROIC_LOWER = 0, linear interpolation between."""
+    return max(0, min(100, int((roic - ROIC_LOWER) / (ROIC_UPPER - ROIC_LOWER) * 100)))
 
 
 def normalize_peg(peg: float) -> int:
-    """PEG < 0.5 = 100, > 2.5 = 0, linear interpolation between."""
+    """PEG <= PEG_LOWER = 100, >= PEG_UPPER = 0, linear interpolation between."""
     if peg <= 0:
         return 0
-    return max(0, min(100, int((2.5 - peg) / 2.0 * 100)))
+    return max(0, min(100, int((PEG_UPPER - peg) / (PEG_UPPER - PEG_LOWER) * 100)))
 
 
 def normalize_debt_ratio(net_debt_ebitda: float) -> int:
-    """NetDebt/EBITDA < 1 = 100, > 4 = 0, linear interpolation between."""
+    """NetDebt/EBITDA <= DEBT_LOWER = 100, >= DEBT_UPPER = 0, linear interpolation between."""
     if net_debt_ebitda < 0:
         return 100  # Net cash position is optimal
-    return max(0, min(100, int((4 - net_debt_ebitda) / 3 * 100)))
+    return max(0, min(100, int((DEBT_UPPER - net_debt_ebitda) / (DEBT_UPPER - DEBT_LOWER) * 100)))
 
 
 def normalize_fcf_conversion(fcf_to_net_income: float) -> int:
-    """FCF/NetIncome > 1.2 = 100, < 0.5 = 0, linear interpolation between."""
-    return max(0, min(100, int((fcf_to_net_income - 0.5) / 0.7 * 100)))
+    """FCF/NetIncome >= FCF_UPPER = 100, <= FCF_LOWER = 0, linear interpolation between."""
+    return max(0, min(100, int((fcf_to_net_income - FCF_LOWER) / (FCF_UPPER - FCF_LOWER) * 100)))
 
 
 def normalize_price_to_book(pb: float) -> int:
-    """P/B < 1.5 = 100, > 3.0 = 0, linear interpolation between."""
-    return max(0, min(100, int((3.0 - pb) / 1.5 * 100)))
+    """P/B <= PB_LOWER = 100, >= PB_UPPER = 0, linear interpolation between."""
+    return max(0, min(100, int((PB_UPPER - pb) / (PB_UPPER - PB_LOWER) * 100)))
 
 
 def normalize_current_ratio(cr: float) -> int:
-    """Current Ratio > 2.0 = 100, < 1.0 = 0, linear interpolation between."""
-    return max(0, min(100, int((cr - 1.0) / 1.0 * 100)))
+    """Current Ratio >= CURRENT_RATIO_UPPER = 100, <= CURRENT_RATIO_LOWER = 0."""
+    return max(
+        0,
+        min(
+            100,
+            int((cr - CURRENT_RATIO_LOWER) / (CURRENT_RATIO_UPPER - CURRENT_RATIO_LOWER) * 100),
+        ),
+    )
 
 
 def normalize_gross_margin(gross_margin: float) -> int:
     """
     Gross margin → 0-100 score using domain-aware thresholds.
 
-    60%+ = 100 (software/luxury), 40-59% = 75 (consumer brands),
-    25-39% = 50 (industrial/healthcare), 10-24% = 25 (retail/distribution), <10% = 0.
+    Tiers defined in scoring_config: HIGH (software/luxury) → 100,
+    MID_HIGH (consumer brands) → 75, MID (industrial/healthcare) → 50,
+    LOW (retail/distribution) → 25, below LOW → 0.
     """
-    if gross_margin >= 0.60:
+    if gross_margin >= GROSS_MARGIN_TIER_HIGH:
         return 100
-    if gross_margin >= 0.40:
+    if gross_margin >= GROSS_MARGIN_TIER_MID_HIGH:
         return 75
-    if gross_margin >= 0.25:
+    if gross_margin >= GROSS_MARGIN_TIER_MID:
         return 50
-    if gross_margin >= 0.10:
+    if gross_margin >= GROSS_MARGIN_TIER_LOW:
         return 25
     return 0
 
@@ -226,13 +251,37 @@ def calculate_trailing_earnings_growth(stock: yf.Ticker) -> float | None:
         return None
 
 
+# ── Compute-once helper ───────────────────────────────────────────────────────
+
+def compute_all_metrics(stock: yf.Ticker) -> dict[str, float | None]:
+    """
+    Compute all raw metrics once from a single yf.Ticker object.
+
+    Pass the returned dict to build_*_metrics() to avoid redundant API calls
+    (ROIC alone touches income_stmt and balance_sheet twice otherwise).
+    """
+    return {
+        "roic": calculate_roic(stock),
+        "fcf_conversion": calculate_fcf_conversion(stock),
+        "net_debt_ebitda": calculate_net_debt_ebitda(stock),
+        "peg_ratio": calculate_peg_ratio(stock),
+        "price_to_book": calculate_price_to_book(stock),
+        "current_ratio": calculate_current_ratio(stock),
+        "earnings_growth": calculate_trailing_earnings_growth(stock),
+    }
+
+
 # ── Pillar metric builders ─────────────────────────────────────────────────────
 
-def build_fortress_metrics(stock: yf.Ticker) -> list[MetricDrillDown]:
+def build_fortress_metrics(
+    stock: yf.Ticker,
+    precomputed: dict[str, float | None] | None = None,
+) -> list[MetricDrillDown]:
     """Build The Fortress pillar (financial health) metrics."""
     metrics = []
+    pc = precomputed or {}
 
-    roic = calculate_roic(stock)
+    roic = pc.get("roic") if precomputed is not None else calculate_roic(stock)
     if roic is not None:
         metrics.append(MetricDrillDown(
             metric_name="ROIC",
@@ -243,7 +292,7 @@ def build_fortress_metrics(stock: yf.Ticker) -> list[MetricDrillDown]:
             confidence="high",
         ))
 
-    fcf = calculate_fcf_conversion(stock)
+    fcf = pc.get("fcf_conversion") if precomputed is not None else calculate_fcf_conversion(stock)
     if fcf is not None:
         metrics.append(MetricDrillDown(
             metric_name="FCF Conversion",
@@ -254,7 +303,9 @@ def build_fortress_metrics(stock: yf.Ticker) -> list[MetricDrillDown]:
             confidence="high",
         ))
 
-    nd_ebitda = calculate_net_debt_ebitda(stock)
+    nd_ebitda = (
+        pc.get("net_debt_ebitda") if precomputed is not None else calculate_net_debt_ebitda(stock)
+    )
     if nd_ebitda is not None:
         metrics.append(MetricDrillDown(
             metric_name="Net Debt / EBITDA",
@@ -268,11 +319,15 @@ def build_fortress_metrics(stock: yf.Ticker) -> list[MetricDrillDown]:
     return metrics
 
 
-def build_engine_metrics(stock: yf.Ticker) -> list[MetricDrillDown]:
+def build_engine_metrics(
+    stock: yf.Ticker,
+    precomputed: dict[str, float | None] | None = None,
+) -> list[MetricDrillDown]:
     """Build The Engine pillar (business quality) metrics."""
     metrics = []
+    pc = precomputed or {}
 
-    roic = calculate_roic(stock)
+    roic = pc.get("roic") if precomputed is not None else calculate_roic(stock)
     if roic is not None:
         metrics.append(MetricDrillDown(
             metric_name="ROIC",
@@ -331,7 +386,10 @@ def build_alignment_metrics(stock: yf.Ticker) -> list[MetricDrillDown]:
                 raw_value=round(shareholder_yield * 100, 2),
                 normalized_score=score,
                 source="yfinance",
-                evidence=f"Dividend yield = {shareholder_yield * 100:.2f}% (buyback yield unavailable from yfinance)",
+                evidence=(
+                    f"Dividend yield = {shareholder_yield * 100:.2f}%"
+                    " (buyback yield unavailable from yfinance)"
+                ),
                 confidence="medium",
             ))
 

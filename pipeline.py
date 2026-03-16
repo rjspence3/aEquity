@@ -3,6 +3,8 @@
 import json
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from datetime import date
 from typing import Any, cast
 
@@ -16,17 +18,22 @@ from models import (
     MetricDrillDown,
     PillarAnalysis,
 )
+from scoring_config import (
+    ALIGNMENT_WEIGHTS,
+    ENGINE_WEIGHTS,
+    FORTRESS_WEIGHTS,
+    HAIKU_MODEL,
+    SONNET_MODEL,
+    VERDICT_AVOID,
+    VERDICT_BUY,
+    VERDICT_HOLD,
+    VERDICT_STRONG_BUY,
+)
 from tools.calculator_tools import (
     build_alignment_metrics,
     build_engine_metrics,
     build_fortress_metrics,
-    calculate_current_ratio,
-    calculate_trailing_earnings_growth,
-    calculate_fcf_conversion,
-    calculate_net_debt_ebitda,
-    calculate_peg_ratio,
-    calculate_price_to_book,
-    calculate_roic,
+    compute_all_metrics,
     normalize_current_ratio,
     normalize_debt_ratio,
     normalize_fcf_conversion,
@@ -39,15 +46,13 @@ from tools.validator import validate_ticker
 
 logger = logging.getLogger(__name__)
 
-_HAIKU = "claude-haiku-4-5-20251001"
-_SONNET = "claude-sonnet-4-5-20250929"
 
-_MAX_SECTION_TOKENS = 180_000  # stay within 200k context window
-
-
-def _truncate_to_tokens(text: str, max_chars: int = 600_000) -> str:
-    """Rough character-based truncation (1 token ≈ 3-4 chars for English)."""
-    return text[:max_chars] if len(text) > max_chars else text
+def _parse_llm_json(raw: str) -> dict:  # type: ignore[type-arg]
+    """Strip optional markdown fences and parse a JSON object from an LLM response."""
+    text = raw.strip()
+    if "```" in text:
+        text = text.split("```")[1].removeprefix("json").strip()
+    return cast(dict, json.loads(text))  # type: ignore[type-arg]
 
 
 # ── LLM helpers ───────────────────────────────────────────────────────────────
@@ -137,13 +142,10 @@ Scoring criteria:
   complexity; 0-20 = opaque or complex
 """
 
-    raw = _call_claude(client, _HAIKU, system_prompt, user_prompt, max_tokens=1024)
+    raw = _call_claude(client, HAIKU_MODEL, system_prompt, user_prompt, max_tokens=1024)
 
     try:
-        json_match = raw.strip()
-        if "```" in json_match:
-            json_match = json_match.split("```")[1].removeprefix("json").strip()
-        return cast(dict[str, object], json.loads(json_match))
+        return cast(dict[str, object], _parse_llm_json(raw))
     except (json.JSONDecodeError, IndexError) as exc:
         logger.warning("Failed to parse moat assessment JSON: %s — raw: %s", exc, raw[:200])
         return {
@@ -194,13 +196,10 @@ company that way. Reference specific metrics. Return exactly this JSON (no markd
 }}
 """
 
-    raw = _call_claude(client, _SONNET, system_prompt, user_prompt, max_tokens=2048)
+    raw = _call_claude(client, SONNET_MODEL, system_prompt, user_prompt, max_tokens=2048)
 
     try:
-        json_str = raw.strip()
-        if "```" in json_str:
-            json_str = json_str.split("```")[1].removeprefix("json").strip()
-        return cast(dict[str, str], json.loads(json_str))
+        return cast(dict[str, str], _parse_llm_json(raw))
     except (json.JSONDecodeError, IndexError) as exc:
         logger.warning("Failed to parse guru rationales JSON: %s", exc)
         return {
@@ -243,13 +242,10 @@ Return exactly this JSON (no markdown):
 }}
 """
 
-    raw = _call_claude(client, _SONNET, system_prompt, user_prompt, max_tokens=1024)
+    raw = _call_claude(client, SONNET_MODEL, system_prompt, user_prompt, max_tokens=1024)
 
     try:
-        json_str = raw.strip()
-        if "```" in json_str:
-            json_str = json_str.split("```")[1].removeprefix("json").strip()
-        return cast(dict[str, str], json.loads(json_str))
+        return cast(dict[str, str], _parse_llm_json(raw))
     except (json.JSONDecodeError, IndexError) as exc:
         logger.warning("Failed to parse pillar summaries JSON: %s", exc)
         return {pillar: f"Score: {score}/100." for pillar, score in pillar_scores.items()}
@@ -346,38 +342,18 @@ def _score_damodaran(
 
 
 def _score_to_verdict(score: int) -> str:
-    if score >= 80:
+    if score >= VERDICT_STRONG_BUY:
         return "Strong Buy"
-    if score >= 65:
+    if score >= VERDICT_BUY:
         return "Buy"
-    if score >= 45:
+    if score >= VERDICT_HOLD:
         return "Hold"
-    if score >= 30:
+    if score >= VERDICT_AVOID:
         return "Avoid"
     return "Strong Avoid"
 
 
 # ── Pillar score aggregation ──────────────────────────────────────────────────
-
-# Explicit weights per pillar. Weights need not sum to 1.0 — they are normalised
-# against whichever metrics are actually present, so missing data degrades
-# gracefully rather than silently shifting the score toward 50.
-_ENGINE_WEIGHTS: dict[str, float] = {
-    "ROIC": 0.60,
-    "Gross Margin": 0.40,
-}
-
-_FORTRESS_WEIGHTS: dict[str, float] = {
-    "FCF Conversion": 0.40,
-    "Net Debt / EBITDA": 0.40,
-    "ROIC": 0.20,
-}
-
-_ALIGNMENT_WEIGHTS: dict[str, float] = {
-    "Insider Ownership": 0.50,
-    "Shareholder Yield": 0.50,
-}
-
 
 def _weighted_score(metrics: list[MetricDrillDown], weights: dict[str, float]) -> int:
     """
@@ -406,15 +382,15 @@ def _weighted_score(metrics: list[MetricDrillDown], weights: dict[str, float]) -
 
 
 def _score_engine(metrics: list[MetricDrillDown]) -> int:
-    return _weighted_score(metrics, _ENGINE_WEIGHTS)
+    return _weighted_score(metrics, ENGINE_WEIGHTS)
 
 
 def _score_fortress(metrics: list[MetricDrillDown]) -> int:
-    return _weighted_score(metrics, _FORTRESS_WEIGHTS)
+    return _weighted_score(metrics, FORTRESS_WEIGHTS)
 
 
 def _score_alignment(metrics: list[MetricDrillDown]) -> int:
-    return _weighted_score(metrics, _ALIGNMENT_WEIGHTS)
+    return _weighted_score(metrics, ALIGNMENT_WEIGHTS)
 
 
 # ── Main pipeline ──────────────────────────────────────────────────────────────
@@ -429,9 +405,20 @@ def analyze_ticker(ticker: str) -> CompanyAnalysis:
 
     # ── Step 1: Fetch company info ─────────────────────────────────────────────
     try:
-        stock = yf.Ticker(ticker)
-        info = stock.info
+        def _fetch_info() -> tuple[yf.Ticker, dict]:
+            s = yf.Ticker(ticker)
+            return s, s.info
+
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_fetch_info)
+            try:
+                stock, info = future.result(timeout=60)
+            except FuturesTimeoutError as exc:
+                raise ValueError(f"yfinance timed out fetching data for {ticker}") from exc
+
         company_name = info.get("longName") or info.get("shortName") or ticker
+    except ValueError:
+        raise
     except Exception as exc:
         logger.error("Failed to fetch info for %s: %s", ticker, exc)
         raise ValueError(f"Ticker {ticker} not found or yfinance unavailable") from exc
@@ -454,16 +441,17 @@ def analyze_ticker(ticker: str) -> CompanyAnalysis:
 
     # ── Step 3: Calculate quantitative metrics ─────────────────────────────────
     logger.info("Calculating quantitative metrics for %s", ticker)
-    roic = calculate_roic(stock)
-    fcf_conv = calculate_fcf_conversion(stock)
-    nd_ebitda = calculate_net_debt_ebitda(stock)
-    peg = calculate_peg_ratio(stock)
-    pb = calculate_price_to_book(stock)
-    current_ratio = calculate_current_ratio(stock)
-    earnings_growth = calculate_trailing_earnings_growth(stock)
+    precomputed = compute_all_metrics(stock)
+    roic = precomputed["roic"]
+    fcf_conv = precomputed["fcf_conversion"]
+    nd_ebitda = precomputed["net_debt_ebitda"]
+    peg = precomputed["peg_ratio"]
+    pb = precomputed["price_to_book"]
+    current_ratio = precomputed["current_ratio"]
+    earnings_growth = precomputed["earnings_growth"]
 
-    fortress_metrics = build_fortress_metrics(stock)
-    engine_metrics = build_engine_metrics(stock)
+    fortress_metrics = build_fortress_metrics(stock, precomputed)
+    engine_metrics = build_engine_metrics(stock, precomputed)
     alignment_metrics = build_alignment_metrics(stock)
 
     # ── Step 4: LLM qualitative assessment ────────────────────────────────────

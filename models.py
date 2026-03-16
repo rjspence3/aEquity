@@ -53,17 +53,3 @@ class CompanyAnalysis(BaseModel):
     partial: bool = False
 
 
-class AnalysisError(BaseModel):
-    """Schema for logging analysis failures."""
-
-    ticker: str
-    error_type: Literal[
-        "not_found",
-        "filing_unavailable",
-        "rate_limit",
-        "timeout",
-        "token_overflow",
-        "missing_data",
-    ]
-    message: str
-    partial_result: dict[str, object] | None = None

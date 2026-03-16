@@ -1,11 +1,13 @@
 """Streamlit dashboard for aEquity analysis."""
 
 import json
+import logging
 import time
 from collections import Counter
 from datetime import datetime, timedelta
 from typing import Any
 
+import anthropic
 import plotly.graph_objects as go
 import streamlit as st
 
@@ -13,7 +15,10 @@ from config import settings
 from db.init import get_all_latest, open_db
 from models import CompanyAnalysis
 from pipeline import analyze_ticker
+from scoring_config import MAX_ANALYSES_PER_HOUR
 from tools.validator import validate_ticker
+
+logger = logging.getLogger(__name__)
 
 # ── Page config ───────────────────────────────────────────────────────────────
 
@@ -26,8 +31,6 @@ st.set_page_config(
 
 # ── Rate limiter ──────────────────────────────────────────────────────────────
 
-_MAX_ANALYSES_PER_HOUR = 20
-
 
 def _check_rate_limit() -> bool:
     if "analysis_timestamps" not in st.session_state:
@@ -39,7 +42,7 @@ def _check_rate_limit() -> bool:
         ts for ts in st.session_state.analysis_timestamps if ts > hour_ago
     ]
 
-    if len(st.session_state.analysis_timestamps) >= _MAX_ANALYSES_PER_HOUR:
+    if len(st.session_state.analysis_timestamps) >= MAX_ANALYSES_PER_HOUR:
         return False
 
     st.session_state.analysis_timestamps.append(now)
@@ -250,12 +253,18 @@ def _render_analysis(result: CompanyAnalysis) -> None:
 
 # ── Screener ──────────────────────────────────────────────────────────────────
 
+@st.cache_data(ttl=300)
+def _load_all_analyses() -> list[CompanyAnalysis]:
+    """Load and deserialize all analyses from the DB. Cached for 5 minutes."""
+    with open_db(settings.database_url) as conn:
+        return get_all_latest(conn)
+
+
 def _render_screener() -> None:
     st.subheader("🔍 Stock Screener")
     st.caption("Filter all analysed companies by score. Run `batch.py` to populate.")
 
-    with open_db(settings.database_url) as conn:
-        results = get_all_latest(conn)
+    results = _load_all_analyses()
 
     if not results:
         st.info("No analyses in the database yet. Run `python batch.py --limit 20` to get started.")
@@ -316,8 +325,7 @@ def _render_macro_radar() -> None:
     st.subheader("🌐 Macro Radar")
     st.caption("Aggregate signals across all analysed companies.")
 
-    with open_db(settings.database_url) as conn:
-        results = get_all_latest(conn)
+    results = _load_all_analyses()
 
     if not results:
         st.info("No analyses in the database yet. Run `python batch.py --limit 20` to get started.")
@@ -437,10 +445,14 @@ def _render_macro_radar() -> None:
     top_col, bot_col = st.columns(2)
     sorted_results = sorted(results, key=lambda r: r.overall_score, reverse=True)
 
+    def _truncate_name(name: str) -> str:
+        return name[:25] + "..." if len(name) > 28 else name
+
     with top_col:
         st.markdown("#### Top 10 Companies")
         top_rows = [
-            {"Ticker": r.ticker, "Company": r.company_name[:28], "Score": r.overall_score}
+            {"Ticker": r.ticker, "Company": _truncate_name(r.company_name),
+             "Score": r.overall_score}
             for r in sorted_results[:10]
         ]
         st.dataframe(top_rows, hide_index=True, use_container_width=True)
@@ -448,7 +460,8 @@ def _render_macro_radar() -> None:
     with bot_col:
         st.markdown("#### Bottom 10 Companies")
         bot_rows = [
-            {"Ticker": r.ticker, "Company": r.company_name[:28], "Score": r.overall_score}
+            {"Ticker": r.ticker, "Company": _truncate_name(r.company_name),
+             "Score": r.overall_score}
             for r in sorted_results[-10:]
         ]
         st.dataframe(bot_rows, hide_index=True, use_container_width=True)
@@ -504,8 +517,20 @@ def main() -> None:
                         st.session_state["analysis_result"] = result
                         elapsed = time.time() - start
                         st.success(f"Analysis complete in {elapsed:.1f}s")
+                    except ValueError:
+                        st.error("Invalid ticker or data unavailable for this symbol.")
+                        st.session_state.pop("analysis_result", None)
+                    except anthropic.AuthenticationError:
+                        st.error("API key error — check that ANTHROPIC_API_KEY is set correctly.")
+                        st.session_state.pop("analysis_result", None)
+                    except anthropic.RateLimitError:
+                        st.error("Rate limit reached. Wait a moment and try again.")
+                        st.session_state.pop("analysis_result", None)
                     except Exception as exc:
-                        st.error(f"Analysis failed: {exc}")
+                        logger.error(
+                            "Unexpected error analyzing %s: %s", ticker_input, exc, exc_info=True
+                        )
+                        st.error("Unexpected error. Check logs for details.")
                         st.session_state.pop("analysis_result", None)
 
         cached: CompanyAnalysis | None = st.session_state.get("analysis_result")

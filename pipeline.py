@@ -29,6 +29,10 @@ from scoring_config import (
     VERDICT_HOLD,
     VERDICT_STRONG_BUY,
 )
+from frameworks import run_new_frameworks
+from services.dimensions import calculate_dimension_grades, calculate_overall_grade
+from services.grader import grade_to_score
+from services.price_targets import calculate_fair_value
 from tools.calculator_tools import (
     build_alignment_metrics,
     build_engine_metrics,
@@ -168,11 +172,19 @@ def _generate_guru_rationales(
     Use Claude Sonnet to generate 3-5 sentence rationales for each guru verdict.
 
     Returns dict mapping guru_name → rationale string.
+    Handles both legacy 4-guru and expanded 8-guru sets.
     """
     system_prompt = (
         "You are an investment analyst writing from the perspectives of legendary investors. "
         "Be specific about the company's actual metrics. Keep each rationale to 3-5 sentences. "
         "Return ONLY a valid JSON object."
+    )
+
+    guru_lines = "\n".join(
+        f"- {name}: {score}/100" for name, score in guru_scores.items()
+    )
+    json_keys = "\n".join(
+        f'  "{name}": "<3-5 sentence rationale>",' for name in guru_scores
     )
 
     user_prompt = f"""Company: {company_name} ({ticker})
@@ -181,22 +193,16 @@ Key Metrics:
 {metrics_summary}
 
 Guru Scores:
-- Warren Buffett: {guru_scores.get("Warren Buffett", 50)}/100
-- Peter Lynch: {guru_scores.get("Peter Lynch", 50)}/100
-- Ben Graham: {guru_scores.get("Ben Graham", 50)}/100
-- Aswath Damodaran: {guru_scores.get("Aswath Damodaran", 50)}/100
+{guru_lines}
 
 For each investor, write a 3-5 sentence rationale explaining WHY they would score this
 company that way. Reference specific metrics. Return exactly this JSON (no markdown):
 {{
-  "Warren Buffett": "<3-5 sentence rationale>",
-  "Peter Lynch": "<3-5 sentence rationale>",
-  "Ben Graham": "<3-5 sentence rationale>",
-  "Aswath Damodaran": "<3-5 sentence rationale>"
+{json_keys}
 }}
 """
 
-    raw = _call_claude(client, SONNET_MODEL, system_prompt, user_prompt, max_tokens=2048)
+    raw = _call_claude(client, SONNET_MODEL, system_prompt, user_prompt, max_tokens=3072)
 
     try:
         return cast(dict[str, str], _parse_llm_json(raw))
@@ -442,6 +448,14 @@ def analyze_ticker(ticker: str) -> CompanyAnalysis:
     # ── Step 3: Calculate quantitative metrics ─────────────────────────────────
     logger.info("Calculating quantitative metrics for %s", ticker)
     precomputed = compute_all_metrics(stock)
+
+    # Add price and per-share fields needed by price_targets
+    current_price = float(info.get("currentPrice") or info.get("regularMarketPrice") or 0)
+    if current_price > 0:
+        precomputed["current_price"] = current_price
+    precomputed["trailing_eps"] = info.get("trailingEps")
+    precomputed["book_value"] = info.get("bookValue")
+
     roic = precomputed["roic"]
     fcf_conv = precomputed["fcf_conversion"]
     nd_ebitda = precomputed["net_debt_ebitda"]
@@ -488,34 +502,60 @@ def analyze_ticker(ticker: str) -> CompanyAnalysis:
     lynch_score = _score_lynch(peg, earnings_growth, understandability)
     graham_score = _score_graham(pb, current_ratio, earnings_growth)
     damodaran_score = _score_damodaran(roic, peg, nd_ebitda)
-    overall_score = int((buffett_score + lynch_score + graham_score + damodaran_score) / 4)
+
+    # Run 4 new framework gurus
+    new_framework_results = run_new_frameworks(precomputed)
+
+    # Overall score: average of all 8 gurus
+    new_scores = [r["score"] for r in new_framework_results.values()]
+    legacy_scores = [buffett_score, lynch_score, graham_score, damodaran_score]
+    all_scores = legacy_scores + new_scores
+    overall_score = int(sum(all_scores) / len(all_scores))
 
     guru_scores = {
         "Warren Buffett": buffett_score,
         "Peter Lynch": lynch_score,
         "Ben Graham": graham_score,
         "Aswath Damodaran": damodaran_score,
+        **{name: r["score"] for name, r in new_framework_results.items()},
     }
+
+    # Dimension grades and letter-grade overall
+    dimension_grades = calculate_dimension_grades(precomputed)
+    overall_grade_enum = calculate_overall_grade(dimension_grades)
+    overall_grade = overall_grade_enum.value
+
+    # Price targets
+    price_targets = calculate_fair_value(precomputed)
 
     # ── Step 6: Generate narrative with Claude Sonnet ─────────────────────────
     logger.info("Generating narratives for %s", ticker)
     metrics_lines = []
-    if roic is not None:
-        metrics_lines.append(f"- ROIC: {roic * 100:.1f}%")
-    if fcf_conv is not None:
-        metrics_lines.append(f"- FCF Conversion: {fcf_conv:.2f}x")
-    if nd_ebitda is not None:
-        metrics_lines.append(f"- Net Debt/EBITDA: {nd_ebitda:.2f}x")
-    if peg is not None:
-        metrics_lines.append(f"- PEG Ratio: {peg:.2f}")
-    if pb is not None:
-        metrics_lines.append(f"- Price/Book: {pb:.2f}")
-    if current_ratio is not None:
-        metrics_lines.append(f"- Current Ratio: {current_ratio:.2f}")
-    if earnings_growth is not None:
-        metrics_lines.append(f"- Earnings Growth: {earnings_growth * 100:.1f}%")
+    _pct_metrics = ["roic", "roic_v2", "roe", "roa", "operating_margin",
+                     "net_margin", "gross_margin", "fcf_yield", "owner_earnings_yield",
+                     "revenue_growth", "eps_growth", "fcf_growth", "earnings_growth",
+                     "earnings_yield", "debt_to_equity"]
+    _labels = {
+        "roic": "ROIC", "roic_v2": "ROIC v2", "roe": "ROE", "roa": "ROA",
+        "operating_margin": "Op Margin", "net_margin": "Net Margin",
+        "gross_margin": "Gross Margin", "fcf_conversion": "FCF Conversion",
+        "fcf_yield": "FCF Yield", "owner_earnings_yield": "Owner Earnings Yield",
+        "net_debt_ebitda": "Net Debt/EBITDA", "peg_ratio": "PEG",
+        "price_to_book": "P/B", "pe_ratio": "P/E", "ev_fcf": "EV/FCF",
+        "current_ratio": "Current Ratio", "debt_to_equity": "D/E",
+        "revenue_growth": "Revenue Growth", "eps_growth": "EPS Growth",
+        "earnings_growth": "Earnings Growth",
+    }
+    for key, label in _labels.items():
+        val = precomputed.get(key)
+        if val is not None:
+            if key in _pct_metrics:
+                metrics_lines.append(f"- {label}: {val * 100:.1f}%")
+            else:
+                metrics_lines.append(f"- {label}: {val:.2f}x")
     metrics_lines.append(f"- Moat Score: {moat_score}/100")
     metrics_lines.append(f"- Understandability: {understandability}/100")
+    metrics_lines.append(f"- Overall Grade: {overall_grade}")
     metrics_summary = "\n".join(metrics_lines)
 
     guru_rationales = _generate_guru_rationales(
@@ -621,11 +661,41 @@ def analyze_ticker(ticker: str) -> CompanyAnalysis:
             key_metrics=key_metrics,
         )
 
+    # Build new framework guru scorecards
+    new_guru_scorecards = []
+    for guru_name, fw_result in new_framework_results.items():
+        fw_grade = fw_result["grade"]
+        fw_score = fw_result["score"]
+        fw_notes = fw_result.get("notes", "")
+        fw_key_metrics = []
+        for metric_key, grade_str in fw_result.get("component_grades", {}).items():
+            val = precomputed.get(metric_key)
+            if val is not None:
+                fw_key_metrics.append(MetricDrillDown(
+                    metric_name=metric_key.replace("_", " ").title(),
+                    raw_value=round(val * 100 if "margin" in metric_key or "yield" in metric_key
+                                    or "growth" in metric_key or metric_key in (
+                                        "roe", "roa", "roic", "roic_v2", "roce") else val, 3),
+                    normalized_score=min(100, max(0, fw_score)),
+                    source="calculated",
+                    evidence=f"{metric_key}: {grade_str}",
+                    confidence="high",
+                ))
+        new_guru_scorecards.append(GuruScorecard(
+            guru_name=guru_name,  # type: ignore[arg-type]
+            score=fw_score,
+            verdict=_score_to_verdict(fw_score),  # type: ignore[arg-type]
+            rationale=guru_rationales.get(guru_name, fw_notes or f"Grade: {fw_grade}"),
+            key_metrics=fw_key_metrics,
+            grade=fw_grade,
+        ))
+
     gurus = [
         _build_guru_scorecard("Warren Buffett", buffett_score, buffett_key_metrics),
         _build_guru_scorecard("Peter Lynch", lynch_score, lynch_key_metrics),
         _build_guru_scorecard("Ben Graham", graham_score, graham_key_metrics),
         _build_guru_scorecard("Aswath Damodaran", damodaran_score, damodaran_key_metrics),
+        *new_guru_scorecards,
     ]
 
     pillars = [
@@ -672,7 +742,9 @@ def analyze_ticker(ticker: str) -> CompanyAnalysis:
         pillars=pillars,
         gurus=gurus,
         overall_score=overall_score,
+        overall_grade=overall_grade,
         confidence=confidence,  # type: ignore[arg-type]
         errors=errors,
         partial=partial,
+        price_targets=price_targets,
     )

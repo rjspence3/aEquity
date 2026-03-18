@@ -30,11 +30,15 @@ class PillarAnalysis(BaseModel):
 class GuruScorecard(BaseModel):
     """Complete analysis from one legendary investor's perspective."""
 
-    guru_name: Literal["Warren Buffett", "Peter Lynch", "Ben Graham", "Aswath Damodaran"]
+    guru_name: Literal[
+        "Warren Buffett", "Peter Lynch", "Ben Graham", "Aswath Damodaran",
+        "Charlie Munger", "Joel Greenblatt", "Howard Marks", "Terry Smith",
+    ]
     score: int = Field(ge=0, le=100)
     verdict: Literal["Strong Buy", "Buy", "Hold", "Avoid", "Strong Avoid"]
     rationale: str
     key_metrics: list[MetricDrillDown]
+    grade: str = ""  # letter grade (e.g. "B+"); empty string for legacy gurus
 
 
 class CompanyAnalysis(BaseModel):
@@ -48,8 +52,10 @@ class CompanyAnalysis(BaseModel):
     pillars: list[PillarAnalysis]
     gurus: list[GuruScorecard]
     overall_score: int = Field(ge=0, le=100)
+    overall_grade: str = ""  # letter grade for the company overall
     confidence: Literal["high", "medium", "low"]
     errors: list[str] = []
     partial: bool = False
+    price_targets: dict | None = None  # zones from services.price_targets
 
 

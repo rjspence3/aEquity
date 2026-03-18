@@ -16,6 +16,13 @@ from db.init import get_all_latest, open_db
 from models import CompanyAnalysis
 from pipeline import analyze_ticker
 from scoring_config import MAX_ANALYSES_PER_HOUR
+from services.watchlist import (
+    add_to_watchlist,
+    get_watchlist_item,
+    list_watchlist,
+    transition_watchlist,
+    update_price_targets,
+)
 from tools.validator import validate_ticker
 
 logger = logging.getLogger(__name__)
@@ -164,7 +171,7 @@ def _render_metric_table(metrics: list) -> None:
 
 def _render_analysis(result: CompanyAnalysis) -> None:
     # ── Header ─────────────────────────────────────────────────────────────────
-    col_name, col_score, col_conf = st.columns([3, 1, 1])
+    col_name, col_score, col_grade, col_conf = st.columns([3, 1, 1, 1])
     with col_name:
         st.title(f"{result.company_name}")
         st.caption(
@@ -173,6 +180,9 @@ def _render_analysis(result: CompanyAnalysis) -> None:
         )
     with col_score:
         st.metric("Overall Score", f"{result.overall_score}/100")
+    with col_grade:
+        grade_display = result.overall_grade or "—"
+        st.metric("Grade", grade_display)
     with col_conf:
         conf_color = _SCORE_COLORS.get(result.confidence, "#94a3b8")
         st.markdown(
@@ -229,8 +239,9 @@ def _render_analysis(result: CompanyAnalysis) -> None:
     guru_cols = st.columns(2)
     for idx, guru in enumerate(result.gurus):
         with guru_cols[idx % 2]:
+            grade_label = f" [{guru.grade}]" if guru.grade else ""
             with st.expander(
-                f"{guru.guru_name} — {guru.score}/100",
+                f"{guru.guru_name} — {guru.score}/100{grade_label}",
                 expanded=True,
             ):
                 st.markdown(_verdict_html(guru.verdict), unsafe_allow_html=True)
@@ -238,6 +249,75 @@ def _render_analysis(result: CompanyAnalysis) -> None:
                 if guru.key_metrics:
                     st.divider()
                     _render_metric_table(guru.key_metrics)
+
+    # ── Price Targets ──────────────────────────────────────────────────────────
+    if result.price_targets:
+        st.divider()
+        st.subheader("🎯 Intrinsic Value & Entry Zones")
+        pt = result.price_targets
+        fv = pt["fair_value"]
+        zones = pt["zones"]
+        methods = pt["methods"]
+
+        zone_cols = st.columns(5)
+        zone_defs = [
+            ("Must Buy", "zones", "must_buy", "#14532d"),
+            ("Compelling", "zones", "compelling", "#166534"),
+            ("Accumulate", "zones", "accumulate", "#365314"),
+            ("Fair Value", "zones", "fair_value", "#713f12"),
+            ("Overvalued", "zones", "overvalued", "#7f1d1d"),
+        ]
+        for col, (label, _, key, color) in zip(zone_cols, zone_defs):
+            with col:
+                st.markdown(
+                    f"<div style='background:{color};padding:8px;border-radius:6px;"
+                    f"text-align:center'><b style='color:#e2e8f0'>{label}</b><br>"
+                    f"<span style='color:#f0fdf4;font-size:1.1em'>${zones[key]:.2f}</span></div>",
+                    unsafe_allow_html=True,
+                )
+
+        st.caption(
+            f"Fair value: **${fv:.2f}** · Methods used: {pt['methods_used']}/4 · "
+            f"Owner Earnings: ${methods.get('owner_earnings') or 0:.2f} · "
+            f"Lynch: ${methods.get('lynch') or 0:.2f} · "
+            f"Graham: ${methods.get('graham') or 0:.2f} · "
+            f"Earnings Power: ${methods.get('earnings_power') or 0:.2f}"
+        )
+
+        # Add to watchlist button
+        st.divider()
+        st.subheader("📋 Watchlist")
+        with open_db(settings.database_url) as conn:
+            wl_item = get_watchlist_item(conn, result.ticker)
+
+        if wl_item is None:
+            if st.button("+ Add to Watchlist", key="add_watchlist"):
+                with open_db(settings.database_url) as conn:
+                    wl = add_to_watchlist(conn, result.ticker, result.company_name)
+                    update_price_targets(
+                        conn, result.ticker,
+                        must_buy=zones["must_buy"],
+                        compelling=zones["compelling"],
+                        accumulate=zones["accumulate"],
+                        fair_value=zones["fair_value"],
+                    )
+                st.success(f"Added {result.ticker} to watchlist (screening)")
+                st.rerun()
+        else:
+            status = wl_item.get("status", "screening")
+            st.info(f"On watchlist — Status: **{status.upper()}**")
+            status_cols = st.columns(4)
+            state_buttons = {
+                "Mark Analyzing": "analyzing",
+                "Mark Watching": "watching",
+                "Mark Buying": "buying",
+            }
+            for idx, (label, new_state) in enumerate(state_buttons.items()):
+                with status_cols[idx]:
+                    if st.button(label, key=f"wl_{new_state}"):
+                        with open_db(settings.database_url) as conn:
+                            transition_watchlist(conn, result.ticker, new_state)
+                        st.rerun()
 
     st.divider()
 
@@ -272,20 +352,32 @@ def _render_screener() -> None:
 
     # Build flat rows for the table
     rows = []
+    _guru_col_map = {
+        "Buffett": "Warren Buffett",
+        "Lynch": "Peter Lynch",
+        "Graham": "Ben Graham",
+        "Damodaran": "Aswath Damodaran",
+        "Munger": "Charlie Munger",
+        "Greenblatt": "Joel Greenblatt",
+        "Marks": "Howard Marks",
+        "Smith": "Terry Smith",
+    }
     for r in results:
         guru_map = {g.guru_name: g.score for g in r.gurus}
-        rows.append({
+        row: dict = {
             "Ticker": r.ticker,
             "Company": r.company_name,
             "Overall": r.overall_score,
-            "Buffett": guru_map.get("Warren Buffett", 0),
-            "Lynch": guru_map.get("Peter Lynch", 0),
-            "Graham": guru_map.get("Ben Graham", 0),
-            "Damodaran": guru_map.get("Aswath Damodaran", 0),
+            "Grade": r.overall_grade or "—",
+        }
+        for short, full in _guru_col_map.items():
+            row[short] = guru_map.get(full, 0)
+        row.update({
             "Confidence": r.confidence,
             "Partial": "⚠" if r.partial else "",
             "Date": str(r.analysis_date),
         })
+        rows.append(row)
 
     # Filters
     filter_col1, filter_col2, filter_col3 = st.columns(3)
@@ -294,7 +386,7 @@ def _render_screener() -> None:
     with filter_col2:
         guru_filter = st.selectbox(
             "Filter by Guru Score ≥",
-            ["(none)", "Buffett", "Lynch", "Graham", "Damodaran"],
+            ["(none)", *list(_guru_col_map.keys())],
             key="screener_guru",
         )
     with filter_col3:
@@ -305,18 +397,112 @@ def _render_screener() -> None:
         filtered = [r for r in filtered if r[guru_filter] >= min_guru_score]
 
     st.caption(f"Showing {len(filtered)} of {len(rows)} companies")
-    st.dataframe(
-        filtered,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Overall": st.column_config.ProgressColumn("Overall", min_value=0, max_value=100),
-            "Buffett": st.column_config.ProgressColumn("Buffett", min_value=0, max_value=100),
-            "Lynch": st.column_config.ProgressColumn("Lynch", min_value=0, max_value=100),
-            "Graham": st.column_config.ProgressColumn("Graham", min_value=0, max_value=100),
-            "Damodaran": st.column_config.ProgressColumn("Damodaran", min_value=0, max_value=100),
-        },
+    progress_cols = {
+        short: st.column_config.ProgressColumn(short, min_value=0, max_value=100)
+        for short in _guru_col_map
+    }
+    progress_cols["Overall"] = st.column_config.ProgressColumn("Overall", min_value=0, max_value=100)
+    st.dataframe(filtered, use_container_width=True, hide_index=True, column_config=progress_cols)
+
+    # ── Add top N results to watchlist ────────────────────────────────────────
+    if filtered:
+        st.divider()
+        add_col1, add_col2, add_col3 = st.columns([2, 1, 3])
+        with add_col1:
+            top_n = st.number_input(
+                "Top N to add to Watchlist",
+                min_value=1, max_value=len(filtered), value=min(20, len(filtered)),
+                step=1, key="screener_top_n",
+            )
+        with add_col2:
+            st.write("")  # vertical alignment spacer
+            st.write("")
+            if st.button("➕ Add to Watchlist", key="screener_add_watchlist"):
+                candidates = sorted(filtered, key=lambda r: r["Overall"], reverse=True)[:int(top_n)]
+                added, skipped = 0, 0
+                # Map ticker → company name from results for the upsert call
+                name_map = {r.ticker: r.company_name for r in results}
+                with open_db(settings.database_url) as conn:
+                    for row in candidates:
+                        ticker = row["Ticker"]
+                        existing = get_watchlist_item(conn, ticker)
+                        if existing:
+                            skipped += 1
+                        else:
+                            add_to_watchlist(conn, ticker, name_map.get(ticker, ""))
+                            added += 1
+                if added:
+                    st.success(f"Added {added} stocks to watchlist (screening). {skipped} already present.")
+                else:
+                    st.info(f"All {skipped} selected stocks are already on the watchlist.")
+
+
+# ── Watchlist ─────────────────────────────────────────────────────────────────
+
+_STATUS_COLORS = {
+    "screening":  "#334155",
+    "analyzing":  "#1e3a5f",
+    "watching":   "#1e3b2e",
+    "buying":     "#1a3a1a",
+    "owned":      "#14532d",
+    "sold":       "#374151",
+    "rejected":   "#7f1d1d",
+    "removed":    "#1f2937",
+}
+
+
+def _render_watchlist() -> None:
+    st.subheader("📋 Watchlist")
+    st.caption("Track investment candidates through the research pipeline.")
+
+    with open_db(settings.database_url) as conn:
+        items = list_watchlist(conn)
+
+    if not items:
+        st.info("No stocks on the watchlist yet. Analyze a stock and add it via the Analyze tab.")
+        return
+
+    status_filter = st.selectbox(
+        "Filter by status",
+        ["All", "screening", "analyzing", "watching", "buying", "owned", "sold", "rejected"],
+        key="wl_status_filter",
     )
+    if status_filter != "All":
+        items = [i for i in items if i["status"] == status_filter]
+
+    st.caption(f"Showing {len(items)} items")
+
+    for item in items:
+        ticker = item["ticker"]
+        status = item["status"]
+        color = _STATUS_COLORS.get(status, "#334155")
+        fv = item.get("fair_value_price")
+        must_buy = item.get("must_buy_price")
+
+        header = (
+            f"**{ticker}** — {item.get('name') or ticker} · "
+            f"<span style='background:{color};padding:2px 8px;border-radius:10px;"
+            f"color:#e2e8f0;font-size:0.85em'>{status.upper()}</span>"
+        )
+        if fv:
+            header += f" · Fair Value: **${fv:.2f}**"
+        if must_buy:
+            header += f" · Must Buy: **${must_buy:.2f}**"
+
+        with st.expander(f"{ticker} — {status.upper()}", expanded=False):
+            st.markdown(header, unsafe_allow_html=True)
+            if item.get("notes"):
+                st.markdown(f"*{item['notes']}*")
+
+            tran_cols = st.columns(5)
+            from services.watchlist import VALID_TRANSITIONS
+            valid_next = VALID_TRANSITIONS.get(status, [])
+            for idx, next_state in enumerate(valid_next):
+                with tran_cols[idx]:
+                    if st.button(f"→ {next_state}", key=f"wl_tran_{ticker}_{next_state}"):
+                        with open_db(settings.database_url) as conn:
+                            transition_watchlist(conn, ticker, next_state)
+                        st.rerun()
 
 
 # ── Macro Radar ───────────────────────────────────────────────────────────────
@@ -483,7 +669,9 @@ def main() -> None:
         " and the Virtual Investment Committee."
     )
 
-    tab_analyze, tab_screener, tab_radar = st.tabs(["Analyze", "Screener", "Macro Radar"])
+    tab_analyze, tab_screener, tab_watchlist, tab_radar = st.tabs(
+        ["Analyze", "Screener", "Watchlist", "Macro Radar"]
+    )
 
     with tab_analyze:
         col_input, col_btn = st.columns([3, 1])
@@ -555,6 +743,9 @@ def main() -> None:
 
     with tab_screener:
         _render_screener()
+
+    with tab_watchlist:
+        _render_watchlist()
 
     with tab_radar:
         _render_macro_radar()

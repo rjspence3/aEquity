@@ -19,7 +19,7 @@ from datetime import date
 from pathlib import Path
 
 from config import settings
-from db.init import get_latest_analysis, open_db, upsert_analysis
+from db.init import get_latest_analysis, open_db, upsert_analysis, upsert_stock
 from pipeline import analyze_ticker
 
 logger = logging.getLogger(__name__)
@@ -55,11 +55,13 @@ def run_batch(
             try:
                 analysis = analyze_ticker(ticker)
                 upsert_analysis(conn, analysis)
+                upsert_stock(conn, ticker, name=analysis.company_name)
                 succeeded += 1
                 logger.info(
-                    "[%d/%d] %s — score=%d confidence=%s partial=%s",
+                    "[%d/%d] %s — score=%d grade=%s confidence=%s partial=%s",
                     index, total, ticker,
                     analysis.overall_score,
+                    analysis.overall_grade or "—",
                     analysis.confidence,
                     analysis.partial,
                 )

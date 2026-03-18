@@ -239,7 +239,6 @@ def calculate_trailing_earnings_growth(stock: yf.Ticker) -> float | None:
     Trailing earnings growth from yfinance info (earningsGrowth field, TTM).
 
     Note: this is trailing 12-month growth, NOT a 5-year CAGR.
-    TODO: compute true 5yr CAGR by comparing historical EPS across annual income statements.
     Falls back to revenueGrowth if earningsGrowth is unavailable.
     """
     try:
@@ -251,18 +250,325 @@ def calculate_trailing_earnings_growth(stock: yf.Ticker) -> float | None:
         return None
 
 
+# ── Additional raw metric functions ───────────────────────────────────────────
+
+def calculate_roe(stock: yf.Ticker) -> float | None:
+    """Return on Equity from yfinance info. Returns decimal (0.20 = 20%)."""
+    try:
+        val = stock.info.get("returnOnEquity")
+        return float(val) if val is not None else None
+    except Exception as exc:
+        logger.debug("ROE failed: %s", exc)
+        return None
+
+
+def calculate_roa(stock: yf.Ticker) -> float | None:
+    """Return on Assets from yfinance info. Returns decimal."""
+    try:
+        val = stock.info.get("returnOnAssets")
+        return float(val) if val is not None else None
+    except Exception as exc:
+        logger.debug("ROA failed: %s", exc)
+        return None
+
+
+def calculate_operating_margin(stock: yf.Ticker) -> float | None:
+    """Operating margin from yfinance info. Returns decimal."""
+    try:
+        val = stock.info.get("operatingMargins")
+        return float(val) if val is not None else None
+    except Exception as exc:
+        logger.debug("Operating margin failed: %s", exc)
+        return None
+
+
+def calculate_net_margin(stock: yf.Ticker) -> float | None:
+    """Net profit margin from yfinance info. Returns decimal."""
+    try:
+        val = stock.info.get("profitMargins")
+        return float(val) if val is not None else None
+    except Exception as exc:
+        logger.debug("Net margin failed: %s", exc)
+        return None
+
+
+def calculate_gross_margin(stock: yf.Ticker) -> float | None:
+    """Gross margin from yfinance info. Returns decimal."""
+    try:
+        val = stock.info.get("grossMargins")
+        return float(val) if val is not None else None
+    except Exception as exc:
+        logger.debug("Gross margin failed: %s", exc)
+        return None
+
+
+def calculate_pe_ratio(stock: yf.Ticker) -> float | None:
+    """Trailing P/E ratio from yfinance info."""
+    try:
+        val = stock.info.get("trailingPE")
+        return float(val) if val is not None else None
+    except Exception as exc:
+        logger.debug("P/E ratio failed: %s", exc)
+        return None
+
+
+def calculate_earnings_yield(stock: yf.Ticker) -> float | None:
+    """Earnings yield = 1 / P/E. Returns decimal (0.05 = 5%)."""
+    pe = calculate_pe_ratio(stock)
+    if pe is not None and pe > 0:
+        return 1.0 / pe
+    return None
+
+
+def calculate_fcf_yield(stock: yf.Ticker) -> float | None:
+    """FCF yield = Free Cash Flow / Market Cap. Returns decimal."""
+    try:
+        info = stock.info
+        fcf = info.get("freeCashflow")
+        market_cap = info.get("marketCap")
+        if fcf is not None and market_cap and market_cap > 0:
+            return float(fcf) / float(market_cap)
+        return None
+    except Exception as exc:
+        logger.debug("FCF yield failed: %s", exc)
+        return None
+
+
+def calculate_ev_fcf(stock: yf.Ticker) -> float | None:
+    """EV / FCF multiple from yfinance info."""
+    try:
+        val = stock.info.get("enterpriseToFreeCashflow")
+        return float(val) if val is not None else None
+    except Exception as exc:
+        logger.debug("EV/FCF failed: %s", exc)
+        return None
+
+
+def calculate_debt_to_equity(stock: yf.Ticker) -> float | None:
+    """Debt-to-equity ratio computed from balance sheet. Returns decimal ratio."""
+    balance = stock.balance_sheet
+    try:
+        total_debt = 0.0
+        for label in ["Total Debt", "Long Term Debt"]:
+            if label in balance.index:
+                total_debt = float(balance.loc[label].iloc[0])
+                break
+
+        equity = None
+        for label in ["Stockholders Equity", "Common Stock Equity",
+                      "Total Equity Gross Minority Interest"]:
+            if label in balance.index:
+                equity = float(balance.loc[label].iloc[0])
+                break
+
+        if equity is None or equity <= 0:
+            return None
+        return total_debt / equity
+
+    except (KeyError, IndexError, ZeroDivisionError, ValueError) as exc:
+        logger.debug("Debt-to-equity failed: %s", exc)
+        return None
+
+
+def calculate_roce(stock: yf.Ticker) -> float | None:
+    """
+    Return on Capital Employed = EBIT / Capital Employed.
+    Capital Employed = Total Assets - Current Liabilities.
+    Returns decimal.
+    """
+    income = stock.income_stmt
+    balance = stock.balance_sheet
+    try:
+        ebit = float(income.loc["Operating Income"].iloc[0])
+        total_assets = float(balance.loc["Total Assets"].iloc[0])
+        current_liabilities = float(balance.loc["Current Liabilities"].iloc[0])
+        capital_employed = total_assets - current_liabilities
+        if capital_employed <= 0:
+            return None
+        return ebit / capital_employed
+    except (KeyError, IndexError, ZeroDivisionError, ValueError) as exc:
+        logger.debug("ROCE failed: %s", exc)
+        return None
+
+
+def calculate_roic_v2(stock: yf.Ticker) -> float | None:
+    """
+    ROIC using a debt+equity definition of invested capital.
+
+    NOPAT = Operating Income × (1 - 0.25)
+    Invested Capital = Total Debt + Total Equity - Cash
+
+    The existing calculate_roic() uses Total Assets - CL - Cash.
+    This version aligns with the debt+equity convention used by most analysts.
+    Returns decimal.
+    """
+    income = stock.income_stmt
+    balance = stock.balance_sheet
+    try:
+        operating_income = float(income.loc["Operating Income"].iloc[0])
+        nopat = operating_income * 0.75  # assumes 25% tax rate
+
+        total_debt = 0.0
+        for label in ["Total Debt", "Long Term Debt"]:
+            if label in balance.index:
+                total_debt = float(balance.loc[label].iloc[0])
+                break
+
+        equity = None
+        for label in ["Stockholders Equity", "Common Stock Equity",
+                      "Total Equity Gross Minority Interest"]:
+            if label in balance.index:
+                equity = float(balance.loc[label].iloc[0])
+                break
+
+        cash = float(balance.loc["Cash And Cash Equivalents"].iloc[0])
+
+        if equity is None:
+            return None
+        invested_capital = total_debt + equity - cash
+        if invested_capital <= 0:
+            return None
+        return nopat / invested_capital
+
+    except (KeyError, IndexError, ZeroDivisionError, ValueError) as exc:
+        logger.debug("ROIC v2 failed: %s", exc)
+        return None
+
+
+def calculate_owner_earnings(stock: yf.Ticker) -> float | None:
+    """
+    Owner Earnings (Buffett) = Net Income + D&A - Capex.
+    Returns absolute value in reporting currency units.
+    """
+    income = stock.income_stmt
+    cashflow = stock.cashflow
+    try:
+        net_income = float(income.loc["Net Income"].iloc[0])
+
+        da = 0.0
+        for label in ["Depreciation And Amortization", "Reconciled Depreciation"]:
+            if label in income.index:
+                da = float(income.loc[label].iloc[0])
+                break
+        if da == 0.0 and "Depreciation And Amortization" in cashflow.index:
+            da = float(cashflow.loc["Depreciation And Amortization"].iloc[0])
+
+        capex = 0.0
+        for label in ["Capital Expenditure", "Capital Expenditures"]:
+            if label in cashflow.index:
+                capex = abs(float(cashflow.loc[label].iloc[0]))
+                break
+
+        return net_income + da - capex
+
+    except (KeyError, IndexError, ValueError) as exc:
+        logger.debug("Owner earnings failed: %s", exc)
+        return None
+
+
+def calculate_owner_earnings_yield(stock: yf.Ticker) -> float | None:
+    """Owner Earnings / Market Cap. Returns decimal."""
+    try:
+        oe = calculate_owner_earnings(stock)
+        market_cap = stock.info.get("marketCap")
+        if oe is not None and market_cap and float(market_cap) > 0:
+            return oe / float(market_cap)
+        return None
+    except Exception as exc:
+        logger.debug("Owner earnings yield failed: %s", exc)
+        return None
+
+
+def calculate_graham_number(stock: yf.Ticker) -> float | None:
+    """Graham Number = sqrt(22.5 × EPS × Book Value Per Share)."""
+    import math
+    try:
+        info = stock.info
+        eps = info.get("trailingEps")
+        bvps = info.get("bookValue")
+        if eps is not None and bvps is not None:
+            eps_val = float(eps)
+            bvps_val = float(bvps)
+            product = 22.5 * eps_val * bvps_val
+            if product > 0:
+                return math.sqrt(product)
+        return None
+    except Exception as exc:
+        logger.debug("Graham Number failed: %s", exc)
+        return None
+
+
+def _growth_from_history(series_current: float, series_prior: float) -> float | None:
+    """YoY growth rate. Returns None if prior is zero or negative."""
+    if series_prior is None or series_prior == 0:
+        return None
+    return (series_current - series_prior) / abs(series_prior)
+
+
+def calculate_revenue_growth(stock: yf.Ticker) -> float | None:
+    """YoY revenue growth from two most recent annual income statements."""
+    try:
+        income = stock.income_stmt
+        if income is None or income.shape[1] < 2:
+            return None
+        for label in ["Total Revenue", "Operating Revenue"]:
+            if label in income.index:
+                current = float(income.loc[label].iloc[0])
+                prior = float(income.loc[label].iloc[1])
+                return _growth_from_history(current, prior)
+        return None
+    except (KeyError, IndexError, ValueError) as exc:
+        logger.debug("Revenue growth failed: %s", exc)
+        return None
+
+
+def calculate_eps_growth(stock: yf.Ticker) -> float | None:
+    """YoY EPS (basic) growth from two most recent annual income statements."""
+    try:
+        income = stock.income_stmt
+        if income is None or income.shape[1] < 2:
+            return None
+        for label in ["Basic EPS", "Diluted EPS"]:
+            if label in income.index:
+                current = float(income.loc[label].iloc[0])
+                prior = float(income.loc[label].iloc[1])
+                return _growth_from_history(current, prior)
+        return None
+    except (KeyError, IndexError, ValueError) as exc:
+        logger.debug("EPS growth failed: %s", exc)
+        return None
+
+
+def calculate_fcf_growth(stock: yf.Ticker) -> float | None:
+    """YoY Free Cash Flow growth from two most recent annual cashflow statements."""
+    try:
+        cashflow = stock.cashflow
+        if cashflow is None or cashflow.shape[1] < 2:
+            return None
+        if "Free Cash Flow" in cashflow.index:
+            current = float(cashflow.loc["Free Cash Flow"].iloc[0])
+            prior = float(cashflow.loc["Free Cash Flow"].iloc[1])
+            return _growth_from_history(current, prior)
+        return None
+    except (KeyError, IndexError, ValueError) as exc:
+        logger.debug("FCF growth failed: %s", exc)
+        return None
+
+
 # ── Compute-once helper ───────────────────────────────────────────────────────
 
 def compute_all_metrics(stock: yf.Ticker) -> dict[str, float | None]:
     """
     Compute all raw metrics once from a single yf.Ticker object.
 
-    Pass the returned dict to build_*_metrics() to avoid redundant API calls
-    (ROIC alone touches income_stmt and balance_sheet twice otherwise).
+    Pass the returned dict to build_*_metrics() and framework analyze functions
+    to avoid redundant API calls. All 7 original keys are preserved unchanged.
+    New keys are appended; existing callers that rely on specific keys are unaffected.
     """
     import math
 
     raw = {
+        # ── Original 7 keys (backward-compatible) ───────────────────────────
         "roic": calculate_roic(stock),
         "fcf_conversion": calculate_fcf_conversion(stock),
         "net_debt_ebitda": calculate_net_debt_ebitda(stock),
@@ -270,6 +576,27 @@ def compute_all_metrics(stock: yf.Ticker) -> dict[str, float | None]:
         "price_to_book": calculate_price_to_book(stock),
         "current_ratio": calculate_current_ratio(stock),
         "earnings_growth": calculate_trailing_earnings_growth(stock),
+        # ── New profitability keys ───────────────────────────────────────────
+        "roe": calculate_roe(stock),
+        "roa": calculate_roa(stock),
+        "roce": calculate_roce(stock),
+        "operating_margin": calculate_operating_margin(stock),
+        "net_margin": calculate_net_margin(stock),
+        "gross_margin": calculate_gross_margin(stock),
+        "roic_v2": calculate_roic_v2(stock),
+        # ── New valuation keys ───────────────────────────────────────────────
+        "pe_ratio": calculate_pe_ratio(stock),
+        "earnings_yield": calculate_earnings_yield(stock),
+        "fcf_yield": calculate_fcf_yield(stock),
+        "ev_fcf": calculate_ev_fcf(stock),
+        # ── New balance sheet keys ───────────────────────────────────────────
+        "debt_to_equity": calculate_debt_to_equity(stock),
+        # ── New cash flow keys ───────────────────────────────────────────────
+        "owner_earnings_yield": calculate_owner_earnings_yield(stock),
+        # ── New growth keys ──────────────────────────────────────────────────
+        "revenue_growth": calculate_revenue_growth(stock),
+        "eps_growth": calculate_eps_growth(stock),
+        "fcf_growth": calculate_fcf_growth(stock),
     }
     return {k: (None if isinstance(v, float) and math.isnan(v) else v) for k, v in raw.items()}
 
@@ -341,20 +668,22 @@ def build_engine_metrics(
             confidence="high",
         ))
 
-    try:
-        gross_margins = stock.info.get("grossMargins")
-        if gross_margins is not None:
-            score = normalize_gross_margin(float(gross_margins))
+    gross_margin = (
+        pc.get("gross_margin") if precomputed is not None else calculate_gross_margin(stock)
+    )
+    if gross_margin is not None:
+        try:
+            score = normalize_gross_margin(gross_margin)
             metrics.append(MetricDrillDown(
                 metric_name="Gross Margin",
-                raw_value=round(float(gross_margins) * 100, 2),
+                raw_value=round(gross_margin * 100, 2),
                 normalized_score=score,
                 source="yfinance",
-                evidence=f"Gross margin = {float(gross_margins) * 100:.1f}%",
+                evidence=f"Gross margin = {gross_margin * 100:.1f}%",
                 confidence="high",
             ))
-    except Exception as exc:
-        logger.debug("Gross margin failed: %s", exc)
+        except Exception as exc:
+            logger.debug("Gross margin metric build failed: %s", exc)
 
     return metrics
 

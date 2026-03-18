@@ -33,7 +33,7 @@ def fetch_sp500_with_ratings(
     2. Get composite score: from DB if cached, else run analysis (unless skip_new)
     3. Return DataFrame: ticker, composite_score, analyst_mean, analyst_inverted
 
-    analyst_inverted = (6 - analyst_mean) / 4 * 100 maps 1→100, 5→25.
+    analyst_inverted = (5 - analyst_mean) / 4 * 100 maps 1→100, 3→50, 5→0.
     Skips tickers where either value is unavailable.
     """
     rows = []
@@ -59,7 +59,7 @@ def fetch_sp500_with_ratings(
             logger.debug("Could not get analysis for %s, skipping", ticker)
             continue
 
-        analyst_inverted = (6.0 - analyst_mean) / 4.0 * 100.0
+        analyst_inverted = (5.0 - analyst_mean) / 4.0 * 100.0
 
         rows.append({
             "ticker": ticker,

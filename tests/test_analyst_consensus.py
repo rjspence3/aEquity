@@ -8,7 +8,7 @@ import pytest
 
 def _make_df(tickers: list[str], composite_scores: list[int], analyst_means: list[float]) -> pd.DataFrame:
     """Build a synthetic DataFrame for consensus tests."""
-    analyst_inverted = [(6.0 - m) / 4.0 * 100.0 for m in analyst_means]
+    analyst_inverted = [(5.0 - m) / 4.0 * 100.0 for m in analyst_means]
     return pd.DataFrame({
         "ticker": tickers,
         "composite_score": composite_scores,
@@ -30,15 +30,15 @@ class TestFindOutliers:
 
         we_love, analysts_love = find_outliers(df, n=2)
 
-        # AAPL has high composite (90) but poor analyst rating (3.5 → inverted=62.5)
-        # delta = 90 - 62.5 = +27.5  →  we love it
+        # AAPL has high composite (90) but poor analyst rating (3.5 → inverted=37.5)
+        # delta = 90 - 37.5 = +52.5  →  we love it
         we_love_tickers = we_love["ticker"].tolist()
         analysts_love_tickers = analysts_love["ticker"].tolist()
 
         assert "AAPL" in we_love_tickers or "TSLA" in we_love_tickers
 
-        # AMZN has high analyst rating (1.2 → inverted=120 capped... well: (6-1.2)/4*100=120)
-        # but low composite (40)  → delta = 40 - 120 = -80  → analysts love it
+        # AMZN has high analyst rating (1.2 → inverted=95.0: (5-1.2)/4*100)
+        # but low composite (40)  → delta = 40 - 95 = -55  → analysts love it
         assert "AMZN" in analysts_love_tickers
 
     def test_find_outliers_delta_column_present(self):
@@ -192,5 +192,5 @@ class TestFetchSp500WithRatings:
             )
 
         assert "analyst_inverted" in result.columns
-        # analyst_mean=1.0 → inverted = (6 - 1) / 4 * 100 = 125.0
-        assert result.iloc[0]["analyst_inverted"] == pytest.approx(125.0)
+        # analyst_mean=1.0 → inverted = (5 - 1) / 4 * 100 = 100.0
+        assert result.iloc[0]["analyst_inverted"] == pytest.approx(100.0)

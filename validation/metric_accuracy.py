@@ -256,7 +256,14 @@ def main(db_url: str | None = None) -> int:
 
     print_summary(all_results, CLEAN_TICKERS, MESSY_TICKERS)
 
-    return 0
+    clean_pass = sum(
+        1 for t in CLEAN_TICKERS for r in all_results.get(t, []) if r["pass_fail"] == "PASS"
+    )
+    clean_total = sum(
+        1 for t in CLEAN_TICKERS for r in all_results.get(t, []) if r["pass_fail"] in ("PASS", "FAIL")
+    )
+    clean_rate = clean_pass / clean_total if clean_total > 0 else 0.0
+    return 1 if clean_rate < 0.80 else 0
 
 
 if __name__ == "__main__":

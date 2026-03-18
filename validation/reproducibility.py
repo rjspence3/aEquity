@@ -22,7 +22,8 @@ def extract_llm_scores(analysis: CompanyAnalysis) -> dict[str, int]:
 
     Finds "The Moat" pillar, then finds MetricDrillDown by metric_name.
     Returns {"moat": int, "understandability": int}.
-    Falls back to pillar score if individual metrics not found.
+    Matching order: exact name first, then case-insensitive partial match
+    ("moat" / "understand"), then falls back to pillar score if neither found.
     """
     moat_pillar = next(
         (p for p in analysis.pillars if p.pillar_name == "The Moat"), None
@@ -31,16 +32,29 @@ def extract_llm_scores(analysis: CompanyAnalysis) -> dict[str, int]:
     if moat_pillar is None:
         return {"moat": 50, "understandability": 50}
 
-    moat_score = moat_pillar.score
-    understandability_score = moat_pillar.score
+    moat_score: int | None = None
+    understandability_score: int | None = None
 
+    # Pass 1: exact match on the names the current pipeline emits.
     for metric in moat_pillar.metrics:
         if metric.metric_name == "Moat Score":
             moat_score = metric.normalized_score
         elif metric.metric_name == "Understandability":
             understandability_score = metric.normalized_score
 
-    return {"moat": moat_score, "understandability": understandability_score}
+    # Pass 2: case-insensitive partial match for any future name variations.
+    if moat_score is None or understandability_score is None:
+        for metric in moat_pillar.metrics:
+            name_lower = metric.metric_name.lower()
+            if moat_score is None and "moat" in name_lower and "understand" not in name_lower:
+                moat_score = metric.normalized_score
+            elif understandability_score is None and "understand" in name_lower:
+                understandability_score = metric.normalized_score
+
+    return {
+        "moat": moat_score if moat_score is not None else moat_pillar.score,
+        "understandability": understandability_score if understandability_score is not None else moat_pillar.score,
+    }
 
 
 def run_ticker_n_times(ticker: str, n: int) -> list[dict[str, int | None]]:
@@ -154,7 +168,13 @@ def main(tickers: list[str] = TICKERS) -> int:
     print(f"Flagged: {flagged_count}/{len(tickers)} tickers")
 
     if all_reports:
-        fieldnames = list(all_reports[0].keys())
+        run_cols = []
+        for metric in ("moat", "understand", "composite"):
+            for i in range(1, N_RUNS + 1):
+                run_cols.append(f"run{i}_{metric}")
+            run_cols.append(f"{metric}_stddev")
+            run_cols.append(f"{metric}_mean")
+        fieldnames = ["ticker"] + run_cols + ["flagged"]
         with open(output_path, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()

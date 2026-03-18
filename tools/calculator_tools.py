@@ -260,7 +260,9 @@ def compute_all_metrics(stock: yf.Ticker) -> dict[str, float | None]:
     Pass the returned dict to build_*_metrics() to avoid redundant API calls
     (ROIC alone touches income_stmt and balance_sheet twice otherwise).
     """
-    return {
+    import math
+
+    raw = {
         "roic": calculate_roic(stock),
         "fcf_conversion": calculate_fcf_conversion(stock),
         "net_debt_ebitda": calculate_net_debt_ebitda(stock),
@@ -269,6 +271,7 @@ def compute_all_metrics(stock: yf.Ticker) -> dict[str, float | None]:
         "current_ratio": calculate_current_ratio(stock),
         "earnings_growth": calculate_trailing_earnings_growth(stock),
     }
+    return {k: (None if isinstance(v, float) and math.isnan(v) else v) for k, v in raw.items()}
 
 
 # ── Pillar metric builders ─────────────────────────────────────────────────────

@@ -208,6 +208,63 @@ class TestExtractLlmScores:
         assert "moat" in result
         assert "understandability" in result
 
+    def test_extract_llm_scores_fuzzy_match(self):
+        """Partial name match finds metrics not named exactly 'Moat Score'/'Understandability'."""
+        from validation.reproducibility import extract_llm_scores
+
+        moat_metric = _make_metric("Moat Strength", raw=77.0, score=77, source="10-K")
+        understand_metric = _make_metric("Understandability Score", raw=83.0, score=83, source="10-K")
+        pillar_moat = PillarAnalysis(
+            pillar_name="The Moat",
+            score=70,
+            metrics=[moat_metric, understand_metric],
+            summary="Moat assessed.",
+            red_flags=[],
+        )
+        pillar_engine = PillarAnalysis(
+            pillar_name="The Engine",
+            score=70,
+            metrics=[_make_metric("ROIC", raw=20.0, score=80)],
+            summary="Engine.",
+            red_flags=[],
+        )
+        pillar_fortress = PillarAnalysis(
+            pillar_name="The Fortress",
+            score=70,
+            metrics=[],
+            summary="Fortress.",
+            red_flags=[],
+        )
+        pillar_alignment = PillarAnalysis(
+            pillar_name="Alignment",
+            score=60,
+            metrics=[],
+            summary="Aligned.",
+            red_flags=[],
+        )
+        guru = GuruScorecard(
+            guru_name="Warren Buffett",
+            score=70,
+            verdict="Buy",
+            rationale="OK.",
+            key_metrics=[],
+        )
+        analysis = CompanyAnalysis(
+            ticker="TEST",
+            company_name="Test Corp",
+            analysis_date=date(2025, 1, 1),
+            filing_date=date(2024, 10, 1),
+            filing_type="10-K",
+            pillars=[pillar_engine, pillar_moat, pillar_fortress, pillar_alignment],
+            gurus=[guru],
+            overall_score=70,
+            confidence="medium",
+        )
+
+        result = extract_llm_scores(analysis)
+        assert result["moat"] == 77
+        assert result["understandability"] == 83
+
 
 class TestComputeVarianceReport:
     def test_compute_variance_report_flags_high_stddev(self):

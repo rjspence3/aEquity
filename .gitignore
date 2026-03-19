@@ -68,8 +68,7 @@ filings_cache/
 # Analysis outputs
 output_*.json
 
-# SQLite database
-db/*.db
+# SQLite database WAL/SHM temp files (db itself is committed)
 db/*.db-shm
 db/*.db-wal
 

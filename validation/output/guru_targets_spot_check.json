@@ -1,0 +1,438 @@
+{
+  "tickers": {
+    "BBW": {
+      "metrics": {
+        "current_price": 40.12,
+        "trailing_eps": 3.99,
+        "book_value": 11.945,
+        "fcf_per_share": null,
+        "earnings_growth": -0.221
+      },
+      "current_price": 40.12,
+      "rows": [
+        {
+          "guru": "buffett",
+          "formula": "fcf_per_share \u00d7 10 \u00d7 0.75",
+          "system_target": null,
+          "hand_target": null,
+          "diff_pct": null,
+          "target_pass": "N/A",
+          "sys_pct_away": null,
+          "hand_pct_away": null,
+          "pct_away_match": true,
+          "sys_in_zone": null,
+          "hand_in_zone": null,
+          "in_zone_match": true
+        },
+        {
+          "guru": "munger",
+          "formula": "trailing_eps \u00d7 15",
+          "system_target": 59.85,
+          "hand_target": 59.85,
+          "diff_pct": 0.0,
+          "target_pass": "PASS",
+          "sys_pct_away": -33.0,
+          "hand_pct_away": -33.0,
+          "pct_away_match": true,
+          "sys_in_zone": true,
+          "hand_in_zone": true,
+          "in_zone_match": true
+        },
+        {
+          "guru": "lynch",
+          "formula": "trailing_eps \u00d7 (earnings_growth \u00d7 100)",
+          "system_target": null,
+          "hand_target": null,
+          "diff_pct": null,
+          "target_pass": "N/A",
+          "sys_pct_away": null,
+          "hand_pct_away": null,
+          "pct_away_match": true,
+          "sys_in_zone": null,
+          "hand_in_zone": null,
+          "in_zone_match": true
+        },
+        {
+          "guru": "greenblatt",
+          "formula": "trailing_eps / 0.12",
+          "system_target": 33.25,
+          "hand_target": 33.25,
+          "diff_pct": 0.0,
+          "target_pass": "PASS",
+          "sys_pct_away": 20.7,
+          "hand_pct_away": 20.7,
+          "pct_away_match": true,
+          "sys_in_zone": false,
+          "hand_in_zone": false,
+          "in_zone_match": true
+        },
+        {
+          "guru": "marks",
+          "formula": "current_price \u00d7 0.50",
+          "system_target": 20.06,
+          "hand_target": 20.06,
+          "diff_pct": 0.0,
+          "target_pass": "PASS",
+          "sys_pct_away": 100.0,
+          "hand_pct_away": 100.0,
+          "pct_away_match": true,
+          "sys_in_zone": false,
+          "hand_in_zone": false,
+          "in_zone_match": true
+        },
+        {
+          "guru": "graham",
+          "formula": "sqrt(22.5 \u00d7 trailing_eps \u00d7 book_value)",
+          "system_target": 32.75,
+          "hand_target": 32.75,
+          "diff_pct": 0.0,
+          "target_pass": "PASS",
+          "sys_pct_away": 22.5,
+          "hand_pct_away": 22.5,
+          "pct_away_match": true,
+          "sys_in_zone": false,
+          "hand_in_zone": false,
+          "in_zone_match": true
+        },
+        {
+          "guru": "smith",
+          "formula": "fcf_per_share / 0.10",
+          "system_target": null,
+          "hand_target": null,
+          "diff_pct": null,
+          "target_pass": "N/A",
+          "sys_pct_away": null,
+          "hand_pct_away": null,
+          "pct_away_match": true,
+          "sys_in_zone": null,
+          "hand_in_zone": null,
+          "in_zone_match": true
+        },
+        {
+          "guru": "fisher",
+          "formula": "None (qualitative)",
+          "system_target": null,
+          "hand_target": null,
+          "diff_pct": null,
+          "target_pass": "N/A",
+          "sys_pct_away": null,
+          "hand_pct_away": null,
+          "pct_away_match": true,
+          "sys_in_zone": null,
+          "hand_in_zone": null,
+          "in_zone_match": true
+        }
+      ]
+    },
+    "AAPL": {
+      "metrics": {
+        "current_price": 248.02,
+        "trailing_eps": 7.9,
+        "book_value": 5.998,
+        "fcf_per_share": 7.2414508104956425,
+        "earnings_growth": 0.183
+      },
+      "current_price": 248.02,
+      "rows": [
+        {
+          "guru": "buffett",
+          "formula": "fcf_per_share \u00d7 10 \u00d7 0.75",
+          "system_target": 54.31,
+          "hand_target": 54.31,
+          "diff_pct": 0.0,
+          "target_pass": "PASS",
+          "sys_pct_away": 356.7,
+          "hand_pct_away": 356.7,
+          "pct_away_match": true,
+          "sys_in_zone": false,
+          "hand_in_zone": false,
+          "in_zone_match": true
+        },
+        {
+          "guru": "munger",
+          "formula": "trailing_eps \u00d7 15",
+          "system_target": 118.5,
+          "hand_target": 118.5,
+          "diff_pct": 0.0,
+          "target_pass": "PASS",
+          "sys_pct_away": 109.3,
+          "hand_pct_away": 109.3,
+          "pct_away_match": true,
+          "sys_in_zone": false,
+          "hand_in_zone": false,
+          "in_zone_match": true
+        },
+        {
+          "guru": "lynch",
+          "formula": "trailing_eps \u00d7 (earnings_growth \u00d7 100)",
+          "system_target": 144.57,
+          "hand_target": 144.57,
+          "diff_pct": 0.0,
+          "target_pass": "PASS",
+          "sys_pct_away": 71.6,
+          "hand_pct_away": 71.6,
+          "pct_away_match": true,
+          "sys_in_zone": false,
+          "hand_in_zone": false,
+          "in_zone_match": true
+        },
+        {
+          "guru": "greenblatt",
+          "formula": "trailing_eps / 0.12",
+          "system_target": 65.83,
+          "hand_target": 65.83,
+          "diff_pct": 0.0,
+          "target_pass": "PASS",
+          "sys_pct_away": 276.8,
+          "hand_pct_away": 276.8,
+          "pct_away_match": true,
+          "sys_in_zone": false,
+          "hand_in_zone": false,
+          "in_zone_match": true
+        },
+        {
+          "guru": "marks",
+          "formula": "current_price \u00d7 0.50",
+          "system_target": 124.01,
+          "hand_target": 124.01,
+          "diff_pct": 0.0,
+          "target_pass": "PASS",
+          "sys_pct_away": 100.0,
+          "hand_pct_away": 100.0,
+          "pct_away_match": true,
+          "sys_in_zone": false,
+          "hand_in_zone": false,
+          "in_zone_match": true
+        },
+        {
+          "guru": "graham",
+          "formula": "sqrt(22.5 \u00d7 trailing_eps \u00d7 book_value)",
+          "system_target": 32.65,
+          "hand_target": 32.65,
+          "diff_pct": 0.0,
+          "target_pass": "PASS",
+          "sys_pct_away": 659.6,
+          "hand_pct_away": 659.6,
+          "pct_away_match": true,
+          "sys_in_zone": false,
+          "hand_in_zone": false,
+          "in_zone_match": true
+        },
+        {
+          "guru": "smith",
+          "formula": "fcf_per_share / 0.10",
+          "system_target": 72.41,
+          "hand_target": 72.41,
+          "diff_pct": 0.0,
+          "target_pass": "PASS",
+          "sys_pct_away": 242.5,
+          "hand_pct_away": 242.5,
+          "pct_away_match": true,
+          "sys_in_zone": false,
+          "hand_in_zone": false,
+          "in_zone_match": true
+        },
+        {
+          "guru": "fisher",
+          "formula": "None (qualitative)",
+          "system_target": null,
+          "hand_target": null,
+          "diff_pct": null,
+          "target_pass": "N/A",
+          "sys_pct_away": null,
+          "hand_pct_away": null,
+          "pct_away_match": true,
+          "sys_in_zone": null,
+          "hand_in_zone": null,
+          "in_zone_match": true
+        }
+      ]
+    },
+    "DPZ": {
+      "metrics": {
+        "current_price": 373.93,
+        "trailing_eps": 17.56,
+        "book_value": -112.88,
+        "fcf_per_share": 15.128777809829982,
+        "earnings_growth": 0.301
+      },
+      "current_price": 373.93,
+      "rows": [
+        {
+          "guru": "buffett",
+          "formula": "fcf_per_share \u00d7 10 \u00d7 0.75",
+          "system_target": 113.47,
+          "hand_target": 113.47,
+          "diff_pct": 0.0,
+          "target_pass": "PASS",
+          "sys_pct_away": 229.5,
+          "hand_pct_away": 229.5,
+          "pct_away_match": true,
+          "sys_in_zone": false,
+          "hand_in_zone": false,
+          "in_zone_match": true
+        },
+        {
+          "guru": "munger",
+          "formula": "trailing_eps \u00d7 15",
+          "system_target": 263.4,
+          "hand_target": 263.4,
+          "diff_pct": 0.0,
+          "target_pass": "PASS",
+          "sys_pct_away": 42.0,
+          "hand_pct_away": 42.0,
+          "pct_away_match": true,
+          "sys_in_zone": false,
+          "hand_in_zone": false,
+          "in_zone_match": true
+        },
+        {
+          "guru": "lynch",
+          "formula": "trailing_eps \u00d7 (earnings_growth \u00d7 100)",
+          "system_target": 528.56,
+          "hand_target": 528.56,
+          "diff_pct": 0.0,
+          "target_pass": "PASS",
+          "sys_pct_away": -29.3,
+          "hand_pct_away": -29.3,
+          "pct_away_match": true,
+          "sys_in_zone": true,
+          "hand_in_zone": true,
+          "in_zone_match": true
+        },
+        {
+          "guru": "greenblatt",
+          "formula": "trailing_eps / 0.12",
+          "system_target": 146.33,
+          "hand_target": 146.33,
+          "diff_pct": 0.0,
+          "target_pass": "PASS",
+          "sys_pct_away": 155.5,
+          "hand_pct_away": 155.5,
+          "pct_away_match": true,
+          "sys_in_zone": false,
+          "hand_in_zone": false,
+          "in_zone_match": true
+        },
+        {
+          "guru": "marks",
+          "formula": "current_price \u00d7 0.50",
+          "system_target": 186.97,
+          "hand_target": 186.97,
+          "diff_pct": 0.0,
+          "target_pass": "PASS",
+          "sys_pct_away": 100.0,
+          "hand_pct_away": 100.0,
+          "pct_away_match": true,
+          "sys_in_zone": false,
+          "hand_in_zone": false,
+          "in_zone_match": true
+        },
+        {
+          "guru": "graham",
+          "formula": "sqrt(22.5 \u00d7 trailing_eps \u00d7 book_value)",
+          "system_target": null,
+          "hand_target": null,
+          "diff_pct": null,
+          "target_pass": "N/A",
+          "sys_pct_away": null,
+          "hand_pct_away": null,
+          "pct_away_match": true,
+          "sys_in_zone": null,
+          "hand_in_zone": null,
+          "in_zone_match": true
+        },
+        {
+          "guru": "smith",
+          "formula": "fcf_per_share / 0.10",
+          "system_target": 151.29,
+          "hand_target": 151.29,
+          "diff_pct": 0.0,
+          "target_pass": "PASS",
+          "sys_pct_away": 147.2,
+          "hand_pct_away": 147.2,
+          "pct_away_match": true,
+          "sys_in_zone": false,
+          "hand_in_zone": false,
+          "in_zone_match": true
+        },
+        {
+          "guru": "fisher",
+          "formula": "None (qualitative)",
+          "system_target": null,
+          "hand_target": null,
+          "diff_pct": null,
+          "target_pass": "N/A",
+          "sys_pct_away": null,
+          "hand_pct_away": null,
+          "pct_away_match": true,
+          "sys_in_zone": null,
+          "hand_in_zone": null,
+          "in_zone_match": true
+        }
+      ]
+    }
+  },
+  "edge_cases": [
+    {
+      "case": "eps=0 \u2192 Munger/Lynch/Greenblatt/Graham all None",
+      "passed": true,
+      "failures": [],
+      "targets": {
+        "buffett": 22.5,
+        "munger": null,
+        "lynch": null,
+        "greenblatt": null,
+        "marks": 25.0,
+        "graham": null,
+        "fisher": null,
+        "smith": 30.0
+      }
+    },
+    {
+      "case": "bvps=-5 \u2192 Graham None",
+      "passed": true,
+      "failures": [],
+      "targets": {
+        "buffett": 22.5,
+        "munger": 30.0,
+        "lynch": 30.0,
+        "greenblatt": 16.67,
+        "marks": 25.0,
+        "graham": null,
+        "fisher": null,
+        "smith": 30.0
+      }
+    },
+    {
+      "case": "earnings_growth=-0.10 \u2192 Lynch None",
+      "passed": true,
+      "failures": [],
+      "targets": {
+        "buffett": 22.5,
+        "munger": 30.0,
+        "lynch": null,
+        "greenblatt": 16.67,
+        "marks": 25.0,
+        "graham": 30.0,
+        "fisher": null,
+        "smith": 30.0
+      }
+    },
+    {
+      "case": "fcf_per_share=0 \u2192 Buffett/Smith None",
+      "passed": true,
+      "failures": [],
+      "targets": {
+        "buffett": null,
+        "munger": 30.0,
+        "lynch": 30.0,
+        "greenblatt": 16.67,
+        "marks": 25.0,
+        "graham": 30.0,
+        "fisher": null,
+        "smith": null
+      }
+    }
+  ]
+}

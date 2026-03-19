@@ -966,6 +966,7 @@ def main() -> None:
         "Decision-grade intelligence from 10-Ks, financial data,"
         " and the Virtual Investment Committee."
     )
+    st.info("⚠️ This is a personal project built for fun. Nothing here is investing advice.", icon=None)
 
     tab_analyze, tab_screener, tab_watchlist, tab_radar = st.tabs(
         ["Analyze", "Screener", "Watchlist", "Macro Radar"]

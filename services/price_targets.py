@@ -9,6 +9,8 @@ from __future__ import annotations
 import logging
 import math
 
+from services.guru_price_targets import calculate_guru_targets
+
 logger = logging.getLogger(__name__)
 
 # Entry zone multipliers relative to fair value
@@ -150,6 +152,41 @@ def calculate_fair_value(metrics: dict[str, float | None]) -> dict | None:
         },
         "methods_used": len(available),
     }
+
+
+def get_all_price_targets(metrics: dict, current_price: float) -> dict:
+    """Return composite valuation zones plus per-guru entry price targets.
+
+    Returns:
+        {
+            'composite': calculate_fair_value result (dict or None),
+            'by_guru': {
+                'buffett': {'target': float | None, 'pct_away': float | None, 'in_zone': bool | None},
+                ... (8 gurus total)
+            }
+        }
+
+    pct_away = ((current_price - target) / target) × 100
+      Positive → price is above target (wait).
+      Negative → price is below target (in zone).
+    in_zone = True when current_price ≤ target.
+    """
+    composite = calculate_fair_value(metrics)
+    raw_targets = calculate_guru_targets(metrics)
+
+    by_guru: dict[str, dict] = {}
+    for guru, target in raw_targets.items():
+        if target is None or current_price is None or current_price <= 0:
+            by_guru[guru] = {"target": target, "pct_away": None, "in_zone": None}
+        else:
+            pct_away = round((current_price - target) / target * 100.0, 1)
+            by_guru[guru] = {
+                "target": target,
+                "pct_away": pct_away,
+                "in_zone": current_price <= target,
+            }
+
+    return {"composite": composite, "by_guru": by_guru}
 
 
 def determine_price_zone(current_price: float, zones: dict[str, float]) -> str:

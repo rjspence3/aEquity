@@ -32,7 +32,7 @@ from scoring_config import (
 from frameworks import run_new_frameworks
 from services.dimensions import calculate_dimension_grades, calculate_overall_grade
 from services.grader import grade_to_score
-from services.price_targets import calculate_fair_value
+from services.price_targets import get_all_price_targets
 from tools.calculator_tools import (
     build_alignment_metrics,
     build_engine_metrics,
@@ -456,6 +456,14 @@ def analyze_ticker(ticker: str) -> CompanyAnalysis:
     precomputed["trailing_eps"] = info.get("trailingEps")
     precomputed["book_value"] = info.get("bookValue")
 
+    # FCF per share: used by Buffett and Smith guru targets
+    raw_fcf = info.get("freeCashflow")
+    shares = info.get("sharesOutstanding")
+    if raw_fcf and shares and float(shares) > 0:
+        precomputed["fcf_per_share"] = float(raw_fcf) / float(shares)
+    else:
+        precomputed["fcf_per_share"] = None
+
     roic = precomputed["roic"]
     fcf_conv = precomputed["fcf_conversion"]
     nd_ebitda = precomputed["net_debt_ebitda"]
@@ -525,8 +533,8 @@ def analyze_ticker(ticker: str) -> CompanyAnalysis:
     overall_grade_enum = calculate_overall_grade(dimension_grades)
     overall_grade = overall_grade_enum.value
 
-    # Price targets
-    price_targets = calculate_fair_value(precomputed)
+    # Price targets (composite zones + per-guru entry prices)
+    price_targets = get_all_price_targets(precomputed, current_price)
 
     # ── Step 6: Generate narrative with Claude Sonnet ─────────────────────────
     logger.info("Generating narratives for %s", ticker)

@@ -277,34 +277,123 @@ def _render_analysis(result: CompanyAnalysis) -> None:
         st.divider()
         st.subheader("🎯 Intrinsic Value & Entry Zones")
         pt = result.price_targets
-        fv = pt["fair_value"]
-        zones = pt["zones"]
-        methods = pt["methods"]
 
-        zone_cols = st.columns(5)
-        zone_defs = [
-            ("Must Buy", "zones", "must_buy", "#DFFF00", "#1A4D2E"),
-            ("Compelling", "zones", "compelling", "#b8e600", "#1A4D2E"),
-            ("Accumulate", "zones", "accumulate", "#2D6A40", "#F0FFF0"),
-            ("Fair Value", "zones", "fair_value", "#FFE66D", "#2D2D00"),
-            ("Overvalued", "zones", "overvalued", "#FF6B6B", "#2D0000"),
-        ]
-        for col, (label, _, key, color, text_color) in zip(zone_cols, zone_defs):
-            with col:
-                st.markdown(
-                    f"<div style='background:{color};padding:8px;border-radius:6px;"
-                    f"text-align:center'><b style='color:{text_color}'>{label}</b><br>"
-                    f"<span style='color:{text_color};font-size:1.1em'>${zones[key]:.2f}</span></div>",
-                    unsafe_allow_html=True,
+        # Support both old flat shape and new nested shape (backward compat with DB records)
+        composite = pt.get("composite") or pt
+        by_guru: dict = pt.get("by_guru", {})
+
+        if composite and composite.get("fair_value"):
+            fv = composite["fair_value"]
+            zones = composite["zones"]
+            methods = composite["methods"]
+
+            zone_cols = st.columns(5)
+            zone_defs = [
+                ("Must Buy", "must_buy", "#DFFF00", "#1A4D2E"),
+                ("Compelling", "compelling", "#b8e600", "#1A4D2E"),
+                ("Accumulate", "accumulate", "#2D6A40", "#F0FFF0"),
+                ("Fair Value", "fair_value", "#FFE66D", "#2D2D00"),
+                ("Overvalued", "overvalued", "#FF6B6B", "#2D0000"),
+            ]
+            for col, (label, key, color, text_color) in zip(zone_cols, zone_defs):
+                with col:
+                    st.markdown(
+                        f"<div style='background:{color};padding:8px;border-radius:6px;"
+                        f"text-align:center'><b style='color:{text_color}'>{label}</b><br>"
+                        f"<span style='color:{text_color};font-size:1.1em'>${zones[key]:.2f}</span></div>",
+                        unsafe_allow_html=True,
+                    )
+
+            st.caption(
+                f"Fair value: **${fv:.2f}** · Methods used: {composite['methods_used']}/4 · "
+                f"Owner Earnings: ${methods.get('owner_earnings') or 0:.2f} · "
+                f"Lynch: ${methods.get('lynch') or 0:.2f} · "
+                f"Graham: ${methods.get('graham') or 0:.2f} · "
+                f"Earnings Power: ${methods.get('earnings_power') or 0:.2f}"
+            )
+
+        # ── Guru Entry Prices ───────────────────────────────────────────────────
+        if by_guru:
+            st.divider()
+            st.subheader("📐 Entry Prices by Guru")
+
+            _GURU_LABELS = {
+                "buffett": "Warren Buffett",
+                "munger": "Charlie Munger",
+                "lynch": "Peter Lynch",
+                "greenblatt": "Joel Greenblatt",
+                "marks": "Howard Marks",
+                "graham": "Ben Graham",
+                "fisher": "Philip Fisher",
+                "smith": "Terry Smith",
+            }
+
+            current_price = result.price_targets.get("composite", {}) and None
+            # Extract current price from composite methods or from the by_guru pct_away
+            # (we reconstruct it from target + pct_away to avoid passing it separately)
+            current_price_display: float | None = None
+            for entry in by_guru.values():
+                t = entry.get("target")
+                p = entry.get("pct_away")
+                if t and p is not None:
+                    current_price_display = round(t * (1 + p / 100.0), 2)
+                    break
+
+            # Sort: in-zone first, then by pct_away ascending, None last
+            rows = []
+            for key, label in _GURU_LABELS.items():
+                entry = by_guru.get(key, {})
+                target = entry.get("target")
+                pct_away = entry.get("pct_away")
+                in_zone = entry.get("in_zone")
+                rows.append((key, label, target, pct_away, in_zone))
+
+            rows.sort(key=lambda r: (r[3] is None, r[3] if r[3] is not None else 0))
+
+            table_rows_html = ""
+            for _, label, target, pct_away, in_zone in rows:
+                if target is None:
+                    row_bg = "rgba(100,100,100,0.15)"
+                    target_str = "N/A"
+                    pct_str = "—"
+                    status_str = "N/A"
+                elif in_zone:
+                    row_bg = "rgba(223,255,0,0.20)"
+                    target_str = f"${target:.2f}"
+                    pct_str = f"{pct_away:+.1f}%"
+                    status_str = "✅ BUY"
+                elif pct_away is not None and pct_away < 20:
+                    row_bg = "rgba(255,160,0,0.15)"
+                    target_str = f"${target:.2f}"
+                    pct_str = f"{pct_away:+.1f}%"
+                    status_str = "🔶 Close"
+                else:
+                    row_bg = "transparent"
+                    target_str = f"${target:.2f}"
+                    pct_str = f"+{pct_away:.1f}%" if pct_away is not None else "—"
+                    status_str = "⏳ Wait"
+
+                table_rows_html += (
+                    f"<tr style='background:{row_bg}'>"
+                    f"<td style='padding:6px 10px'>{label}</td>"
+                    f"<td style='padding:6px 10px;text-align:right;font-family:monospace'>{target_str}</td>"
+                    f"<td style='padding:6px 10px;text-align:right;font-family:monospace'>{pct_str}</td>"
+                    f"<td style='padding:6px 10px;text-align:center'>{status_str}</td>"
+                    f"</tr>"
                 )
 
-        st.caption(
-            f"Fair value: **${fv:.2f}** · Methods used: {pt['methods_used']}/4 · "
-            f"Owner Earnings: ${methods.get('owner_earnings') or 0:.2f} · "
-            f"Lynch: ${methods.get('lynch') or 0:.2f} · "
-            f"Graham: ${methods.get('graham') or 0:.2f} · "
-            f"Earnings Power: ${methods.get('earnings_power') or 0:.2f}"
-        )
+            st.markdown(
+                "<table style='width:100%;border-collapse:collapse'>"
+                "<thead><tr style='border-bottom:1px solid #444'>"
+                "<th style='padding:6px 10px;text-align:left'>Guru</th>"
+                "<th style='padding:6px 10px;text-align:right'>Buy At</th>"
+                "<th style='padding:6px 10px;text-align:right'>vs Current</th>"
+                "<th style='padding:6px 10px;text-align:center'>Status</th>"
+                f"</tr></thead><tbody>{table_rows_html}</tbody></table>",
+                unsafe_allow_html=True,
+            )
+            if current_price_display:
+                st.caption(f"Current price used for % calculations: **${current_price_display:.2f}**")
 
         # Add to watchlist button
         st.divider()
@@ -386,6 +475,13 @@ def _render_screener() -> None:
     }
     for r in results:
         guru_map = {g.guru_name: g.score for g in r.gurus}
+
+        # Extract composite fair value — handles both old flat and new nested shapes
+        pt = r.price_targets or {}
+        composite = pt.get("composite") or pt
+        fair_value = composite.get("fair_value") if composite else None
+        must_buy = composite.get("zones", {}).get("must_buy") if composite else None
+
         row: dict = {
             "Ticker": r.ticker,
             "Company": r.company_name,
@@ -395,6 +491,8 @@ def _render_screener() -> None:
         for short, full in _guru_col_map.items():
             row[short] = guru_map.get(full, 0)
         row.update({
+            "Fair Value": fair_value,
+            "Must Buy": must_buy,
             "Confidence": r.confidence,
             "Partial": "⚠" if r.partial else "",
             "Date": str(r.analysis_date),
@@ -424,6 +522,8 @@ def _render_screener() -> None:
         for short in _guru_col_map
     }
     progress_cols["Overall"] = st.column_config.ProgressColumn("Overall", min_value=0, max_value=100)
+    progress_cols["Fair Value"] = st.column_config.NumberColumn("Fair Value", format="$%.2f")
+    progress_cols["Must Buy"] = st.column_config.NumberColumn("Must Buy", format="$%.2f")
     st.dataframe(filtered, use_container_width=True, hide_index=True, column_config=progress_cols)
 
     # ── Add top N results to watchlist ────────────────────────────────────────

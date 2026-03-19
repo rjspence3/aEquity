@@ -58,6 +58,21 @@ class TestBuffettScore:
         )
         assert score < 40
 
+    def test_degradation_only_moat_available(self):
+        # moat_score=80, all quantitative inputs None.
+        # Only component is (0.25, 80); total_weight=0.25 → score = 80.
+        # Verifies "never silently shifts toward 50" — result must equal moat value.
+        score = _score_buffett(None, None, 80, None)
+        assert score == 80
+
+    def test_degradation_weighted_average_of_available(self):
+        # roic available → normalize_roic(0.25) = 100 (above ROIC_UPPER=0.20)
+        # moat_score = 0
+        # weights: roic=0.30, moat=0.25; total=0.55
+        # expected = int((0.30*100 + 0.25*0) / 0.55) = int(54.54) = 54
+        score = _score_buffett(roic=0.25, fcf_conv=None, moat_score=0, nd_ebitda=None)
+        assert score == 54
+
 
 class TestLynchScore:
     def test_strong_growth_low_peg(self):
@@ -75,6 +90,12 @@ class TestLynchScore:
     def test_all_none_returns_50(self):
         score = _score_lynch(None, None, 50)
         assert score == 50
+
+    def test_degradation_only_understandability_available(self):
+        # peg=None, earnings_growth=None → only understandability component (weight 0.30).
+        # total_weight=0.30 → score = understandability value (not pulled toward 50).
+        score = _score_lynch(peg=None, earnings_growth=None, understandability=90)
+        assert score == 90
 
 
 class TestGrahamScore:
@@ -94,6 +115,17 @@ class TestGrahamScore:
         score_pos = _score_graham(pb=2.0, current_ratio=1.5, earnings_growth=0.10)
         score_neg = _score_graham(pb=2.0, current_ratio=1.5, earnings_growth=-0.10)
         assert score_pos > score_neg
+
+    def test_degradation_only_growth_available(self):
+        # pb=None, current_ratio=None → only earnings_growth component (weight 0.30).
+        # earnings_growth=0.10 > 0 → stability=100; score = 100.
+        score = _score_graham(pb=None, current_ratio=None, earnings_growth=0.10)
+        assert score == 100
+
+    def test_degradation_negative_growth_only(self):
+        # pb=None, current_ratio=None, earnings_growth=-0.05 → stability=0; score = 0.
+        score = _score_graham(pb=None, current_ratio=None, earnings_growth=-0.05)
+        assert score == 0
 
 
 class TestDamodaranScore:

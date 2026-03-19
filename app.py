@@ -59,18 +59,18 @@ def _check_rate_limit() -> bool:
 # ── Chart helpers ─────────────────────────────────────────────────────────────
 
 _SCORE_COLORS = {
-    "high": "#22c55e",
-    "medium": "#f59e0b",
-    "low": "#ef4444",
+    "high": "#DFFF00",
+    "medium": "#FFE66D",
+    "low": "#FF6B6B",
 }
 
 
 def _score_color(score: int) -> str:
     if score >= 65:
-        return "#22c55e"
+        return "#DFFF00"
     if score >= 40:
-        return "#f59e0b"
-    return "#ef4444"
+        return "#FFE66D"
+    return "#FF6B6B"
 
 
 def _gauge_chart(score: int, title: str) -> go.Figure:
@@ -82,12 +82,12 @@ def _gauge_chart(score: int, title: str) -> go.Figure:
         gauge={
             "axis": {"range": [0, 100], "tickwidth": 1},
             "bar": {"color": color, "thickness": 0.3},
-            "bgcolor": "#1e293b",
+            "bgcolor": "#234D32",
             "borderwidth": 0,
             "steps": [
-                {"range": [0, 40], "color": "#1e293b"},
-                {"range": [40, 65], "color": "#1e293b"},
-                {"range": [65, 100], "color": "#1e293b"},
+                {"range": [0, 40], "color": "#234D32"},
+                {"range": [40, 65], "color": "#234D32"},
+                {"range": [65, 100], "color": "#234D32"},
             ],
             "threshold": {
                 "line": {"color": color, "width": 3},
@@ -101,7 +101,7 @@ def _gauge_chart(score: int, title: str) -> go.Figure:
         height=180,
         margin={"t": 40, "b": 0, "l": 10, "r": 10},
         paper_bgcolor="rgba(0,0,0,0)",
-        font_color="#e2e8f0",
+        font_color="#F0FFF0",
     )
     return fig
 
@@ -122,8 +122,8 @@ def _bar_chart(labels: list[str], scores: list[int], title: str) -> go.Figure:
         margin={"t": 40, "b": 20, "l": 10, "r": 10},
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font_color="#e2e8f0",
-        yaxis={"gridcolor": "#334155", "showgrid": True},
+        font_color="#F0FFF0",
+        yaxis={"gridcolor": "#2D6A40", "showgrid": True},
         xaxis={"tickfont": {"size": 11}},
     )
     return fig
@@ -132,16 +132,31 @@ def _bar_chart(labels: list[str], scores: list[int], title: str) -> go.Figure:
 # ── Verdict badge ─────────────────────────────────────────────────────────────
 
 _VERDICT_STYLES = {
-    "Strong Buy":    ("🟢", "#14532d", "#bbf7d0"),
-    "Buy":           ("🟩", "#166534", "#dcfce7"),
-    "Hold":          ("🟡", "#713f12", "#fef9c3"),
-    "Avoid":         ("🟠", "#7c2d12", "#ffedd5"),
-    "Strong Avoid":  ("🔴", "#7f1d1d", "#fee2e2"),
+    "Strong Buy":    ("🟢", "#DFFF00", "#1A4D2E"),
+    "Buy":           ("🟩", "#b8e600", "#1A4D2E"),
+    "Hold":          ("🟡", "#FFE66D", "#2D2D00"),
+    "Avoid":         ("🟠", "#FF9A3C", "#2D1500"),
+    "Strong Avoid":  ("🔴", "#FF6B6B", "#2D0000"),
 }
 
 
+def _grade_badge_html(grade: str) -> str:
+    """Return a coloured HTML badge for a letter grade."""
+    g = (grade or "").strip()
+    if g.startswith(("A", "B")):
+        bg, text = "#DFFF00", "#1A4D2E"
+    elif g.startswith("C"):
+        bg, text = "#FFE66D", "#2D2D00"
+    else:
+        bg, text = "#FF6B6B", "#2D0000"
+    return (
+        f'<span style="background:{bg};color:{text};padding:2px 8px;'
+        f'border-radius:6px;font-weight:700;font-size:13px">{g}</span>'
+    )
+
+
 def _verdict_html(verdict: str) -> str:
-    icon, bg, text = _VERDICT_STYLES.get(verdict, ("⚪", "#1e293b", "#e2e8f0"))
+    icon, bg, text = _VERDICT_STYLES.get(verdict, ("⚪", "#234D32", "#F0FFF0"))
     return (
         f'<span style="background:{bg};color:{text};padding:3px 10px;'
         f'border-radius:12px;font-weight:600;font-size:13px;">{icon} {verdict}</span>'
@@ -182,7 +197,11 @@ def _render_analysis(result: CompanyAnalysis) -> None:
         st.metric("Overall Score", f"{result.overall_score}/100")
     with col_grade:
         grade_display = result.overall_grade or "—"
-        st.metric("Grade", grade_display)
+        st.caption("Grade")
+        if result.overall_grade:
+            st.markdown(_grade_badge_html(result.overall_grade), unsafe_allow_html=True)
+        else:
+            st.markdown("—")
     with col_conf:
         conf_color = _SCORE_COLORS.get(result.confidence, "#94a3b8")
         st.markdown(
@@ -244,7 +263,10 @@ def _render_analysis(result: CompanyAnalysis) -> None:
                 f"{guru.guru_name} — {guru.score}/100{grade_label}",
                 expanded=True,
             ):
-                st.markdown(_verdict_html(guru.verdict), unsafe_allow_html=True)
+                badge_row = _verdict_html(guru.verdict)
+                if guru.grade:
+                    badge_row += "&nbsp;&nbsp;" + _grade_badge_html(guru.grade)
+                st.markdown(badge_row, unsafe_allow_html=True)
                 st.markdown(f"\n{guru.rationale}")
                 if guru.key_metrics:
                     st.divider()
@@ -261,18 +283,18 @@ def _render_analysis(result: CompanyAnalysis) -> None:
 
         zone_cols = st.columns(5)
         zone_defs = [
-            ("Must Buy", "zones", "must_buy", "#14532d"),
-            ("Compelling", "zones", "compelling", "#166534"),
-            ("Accumulate", "zones", "accumulate", "#365314"),
-            ("Fair Value", "zones", "fair_value", "#713f12"),
-            ("Overvalued", "zones", "overvalued", "#7f1d1d"),
+            ("Must Buy", "zones", "must_buy", "#DFFF00", "#1A4D2E"),
+            ("Compelling", "zones", "compelling", "#b8e600", "#1A4D2E"),
+            ("Accumulate", "zones", "accumulate", "#2D6A40", "#F0FFF0"),
+            ("Fair Value", "zones", "fair_value", "#FFE66D", "#2D2D00"),
+            ("Overvalued", "zones", "overvalued", "#FF6B6B", "#2D0000"),
         ]
-        for col, (label, _, key, color) in zip(zone_cols, zone_defs):
+        for col, (label, _, key, color, text_color) in zip(zone_cols, zone_defs):
             with col:
                 st.markdown(
                     f"<div style='background:{color};padding:8px;border-radius:6px;"
-                    f"text-align:center'><b style='color:#e2e8f0'>{label}</b><br>"
-                    f"<span style='color:#f0fdf4;font-size:1.1em'>${zones[key]:.2f}</span></div>",
+                    f"text-align:center'><b style='color:{text_color}'>{label}</b><br>"
+                    f"<span style='color:{text_color};font-size:1.1em'>${zones[key]:.2f}</span></div>",
                     unsafe_allow_html=True,
                 )
 
@@ -440,14 +462,14 @@ def _render_screener() -> None:
 # ── Watchlist ─────────────────────────────────────────────────────────────────
 
 _STATUS_COLORS = {
-    "screening":  "#334155",
-    "analyzing":  "#1e3a5f",
-    "watching":   "#1e3b2e",
-    "buying":     "#1a3a1a",
-    "owned":      "#14532d",
-    "sold":       "#374151",
-    "rejected":   "#7f1d1d",
-    "removed":    "#1f2937",
+    "screening":  "#2D6A40",
+    "analyzing":  "#1A5C35",
+    "watching":   "#DFFF00",
+    "buying":     "#b8e600",
+    "owned":      "#234D32",
+    "sold":       "#3D5C40",
+    "rejected":   "#FF6B6B",
+    "removed":    "#2D3D30",
 }
 
 
@@ -482,7 +504,7 @@ def _render_watchlist() -> None:
         header = (
             f"**{ticker}** — {item.get('name') or ticker} · "
             f"<span style='background:{color};padding:2px 8px;border-radius:10px;"
-            f"color:#e2e8f0;font-size:0.85em'>{status.upper()}</span>"
+            f"color:#1A4D2E;font-size:0.85em'>{status.upper()}</span>"
         )
         if fv:
             header += f" · Fair Value: **${fv:.2f}**"
@@ -564,8 +586,8 @@ def _render_macro_radar() -> None:
         margin={"t": 20, "b": 20, "l": 10, "r": 10},
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font_color="#e2e8f0",
-        yaxis={"gridcolor": "#334155"},
+        font_color="#F0FFF0",
+        yaxis={"gridcolor": "#2D6A40"},
     )
     st.plotly_chart(dist_fig, use_container_width=True, config={"displayModeBar": False})
 
@@ -608,7 +630,7 @@ def _render_macro_radar() -> None:
             x=flag_values,
             y=flag_labels,
             orientation="h",
-            marker_color="#ef4444",
+            marker_color="#FF6B6B",
             text=flag_values,
             textposition="outside",
         ))
@@ -617,8 +639,8 @@ def _render_macro_radar() -> None:
             margin={"t": 10, "b": 10, "l": 10, "r": 60},
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            font_color="#e2e8f0",
-            xaxis={"gridcolor": "#334155"},
+            font_color="#F0FFF0",
+            xaxis={"gridcolor": "#2D6A40"},
             yaxis={"autorange": "reversed"},
         )
         st.plotly_chart(flag_fig, use_container_width=True, config={"displayModeBar": False})
@@ -658,8 +680,136 @@ def _render_macro_radar() -> None:
 def main() -> None:
     st.markdown("""
     <style>
-    .stApp { background-color: #0f172a; color: #e2e8f0; }
-    .stMetric { background: #1e293b; border-radius: 8px; padding: 12px; }
+    /* ── Acid Forest Design Tokens ─────────────────────────────────────── */
+    :root {
+        --bg-base:       #1A4D2E;
+        --surface:       #234D32;
+        --surface-dark:  #153D24;
+        --primary:       #DFFF00;
+        --primary-dim:   #b8e600;
+        --text-primary:  #F0FFF0;
+        --text-muted:    #8FBC8F;
+        --danger:        #FF6B6B;
+        --warning:       #FFE66D;
+        --grid-line:     #2D6A40;
+        --outer-radius:  12px;
+        --padding:       8px;
+        --inner-radius:  calc(var(--outer-radius) - var(--padding));
+    }
+
+    /* ── Base ───────────────────────────────────────────────────────────── */
+    .stApp {
+        background: radial-gradient(ellipse 80% 50% at 50% 0%,
+            rgba(223,255,0,0.05) 0%,
+            var(--bg-base) 60%);
+        color: var(--text-primary);
+    }
+
+    /* ── Typography ─────────────────────────────────────────────────────── */
+    .stApp .stMarkdown p,
+    .stApp .stText,
+    .stApp label,
+    .stApp .stCaption {
+        font-size: calc(14px + 0.5vw);
+        color: var(--text-primary);
+    }
+    .stApp h1, .stApp h2, .stApp h3,
+    .stApp .stMarkdown h1, .stApp .stMarkdown h2, .stApp .stMarkdown h3 {
+        font-size: calc(18px + 1vw);
+        font-weight: 600;
+        color: var(--primary);
+    }
+    .stApp .stCaption p { color: var(--text-muted); font-size: 0.85em; }
+
+    /* ── Metrics ────────────────────────────────────────────────────────── */
+    [data-testid="stMetric"] {
+        background: var(--surface);
+        border-radius: var(--outer-radius);
+        border: 1px solid rgba(223,255,0,0.2);
+        padding: var(--padding);
+    }
+    [data-testid="stMetricValue"] { color: var(--primary); }
+    [data-testid="stMetricLabel"] { color: var(--text-muted); }
+
+    /* ── Buttons ────────────────────────────────────────────────────────── */
+    .stButton > button {
+        background: var(--primary) !important;
+        color: var(--bg-base) !important;
+        border: none !important;
+        border-radius: 6px !important;
+        min-height: 44px !important;
+        font-weight: 600 !important;
+    }
+    .stButton > button:hover {
+        background: var(--primary-dim) !important;
+    }
+
+    /* ── Dataframes / Tables ────────────────────────────────────────────── */
+    [data-testid="stDataFrame"],
+    [data-testid="stDataFrameResizable"] {
+        background: var(--surface) !important;
+        border-radius: var(--inner-radius);
+        border: 1px solid rgba(223,255,0,0.15);
+    }
+    [data-testid="stDataFrame"] th {
+        background: var(--surface-dark) !important;
+        color: rgba(223,255,0,0.8) !important;
+        font-weight: 600;
+    }
+    [data-testid="stDataFrame"] td {
+        color: var(--text-primary) !important;
+    }
+
+    /* ── Tabs ───────────────────────────────────────────────────────────── */
+    .stTabs [data-baseweb="tab-list"] {
+        background: var(--surface-dark);
+        border-radius: var(--outer-radius);
+        gap: 4px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        color: var(--text-primary);
+        border-radius: var(--inner-radius);
+    }
+    .stTabs [data-baseweb="tab"]:not([aria-selected="true"]) {
+        color: var(--text-primary) !important;
+        opacity: 0.7;
+    }
+    .stTabs [aria-selected="true"] {
+        background: var(--primary) !important;
+        color: var(--bg-base) !important;
+        font-weight: 600;
+        opacity: 1;
+    }
+
+    /* ── Expanders ──────────────────────────────────────────────────────── */
+    [data-testid="stExpander"] {
+        background: var(--surface);
+        border: 1px solid rgba(223,255,0,0.15);
+        border-radius: var(--outer-radius);
+    }
+
+    /* ── Sidebar ────────────────────────────────────────────────────────── */
+    [data-testid="stSidebar"] {
+        background: var(--surface-dark);
+    }
+    [data-testid="stSidebar"] .stMarkdown p { color: var(--text-muted); }
+
+    /* ── Inputs ─────────────────────────────────────────────────────────── */
+    .stTextInput > div > div > input,
+    .stSelectbox > div > div {
+        background: var(--surface) !important;
+        color: var(--text-primary) !important;
+        border-color: rgba(223,255,0,0.3) !important;
+        border-radius: var(--inner-radius) !important;
+    }
+
+    /* ── Progress bars (Screener ProgressColumn) ────────────────────────── */
+    [role="progressbar"] > div {
+        background: var(--primary) !important;
+    }
+
+    /* ── Alerts ─────────────────────────────────────────────────────────── */
+    [data-testid="stAlert"] { border-radius: var(--inner-radius); }
     </style>
     """, unsafe_allow_html=True)
 

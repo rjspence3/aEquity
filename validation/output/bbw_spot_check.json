@@ -1,0 +1,377 @@
+{
+  "ticker": "BBW",
+  "total_metrics": 23,
+  "hand_pass": 20,
+  "hand_fail": 0,
+  "hand_na": 3,
+  "grade_correct": 23,
+  "grade_total": 23,
+  "failures": [],
+  "grade_failures": [],
+  "rows": [
+    {
+      "metric": "current_ratio",
+      "aequity": 1.5907751215457087,
+      "hand": 1.5907751215457087,
+      "finviz": 1.55,
+      "ah_diff_pct": 0.0,
+      "af_diff_pct": 2.6306530029489426,
+      "hand_pass": "PASS",
+      "grade": "B-",
+      "grade_verified": true
+    },
+    {
+      "metric": "debt_to_equity",
+      "aequity": 0.6974015329086438,
+      "hand": 0.6974015329086438,
+      "finviz": 0.82,
+      "ah_diff_pct": 0.0,
+      "af_diff_pct": 14.9510325721166,
+      "hand_pass": "PASS",
+      "grade": "B-",
+      "grade_verified": true
+    },
+    {
+      "metric": "earnings_growth",
+      "aequity": -0.221,
+      "hand": -0.221,
+      "finviz": null,
+      "ah_diff_pct": 0.0,
+      "af_diff_pct": null,
+      "hand_pass": "PASS",
+      "grade": "F",
+      "grade_verified": true
+    },
+    {
+      "metric": "earnings_yield",
+      "aequity": 0.10973137320912914,
+      "hand": 0.10973137320912914,
+      "finviz": null,
+      "ah_diff_pct": 0.0,
+      "af_diff_pct": null,
+      "hand_pass": "PASS",
+      "grade": "A",
+      "grade_verified": true
+    },
+    {
+      "metric": "eps_growth",
+      "aequity": 0.03532608695652171,
+      "hand": 0.03532608695652171,
+      "finviz": null,
+      "ah_diff_pct": 0.0,
+      "af_diff_pct": null,
+      "hand_pass": "PASS",
+      "grade": "C",
+      "grade_verified": true
+    },
+    {
+      "metric": "ev_fcf",
+      "aequity": null,
+      "hand": null,
+      "finviz": null,
+      "ah_diff_pct": null,
+      "af_diff_pct": null,
+      "hand_pass": "N/A",
+      "grade": "INC",
+      "grade_verified": true
+    },
+    {
+      "metric": "fcf_conversion",
+      "aequity": 0.5362556724920343,
+      "hand": 0.5362556724920343,
+      "finviz": null,
+      "ah_diff_pct": 0.0,
+      "af_diff_pct": null,
+      "hand_pass": "PASS",
+      "grade": "C",
+      "grade_verified": true
+    },
+    {
+      "metric": "fcf_growth",
+      "aequity": -0.3965011409323047,
+      "hand": -0.3965011409323047,
+      "finviz": null,
+      "ah_diff_pct": 0.0,
+      "af_diff_pct": null,
+      "hand_pass": "PASS",
+      "grade": "F",
+      "grade_verified": true
+    },
+    {
+      "metric": "fcf_yield",
+      "aequity": null,
+      "hand": null,
+      "finviz": null,
+      "ah_diff_pct": null,
+      "af_diff_pct": null,
+      "hand_pass": "N/A",
+      "grade": "INC",
+      "grade_verified": true
+    },
+    {
+      "metric": "gross_margin",
+      "aequity": 0.55797,
+      "hand": 0.55797,
+      "finviz": 0.5579999999999999,
+      "ah_diff_pct": 0.0,
+      "af_diff_pct": 0.005376344086016935,
+      "hand_pass": "PASS",
+      "grade": "A",
+      "grade_verified": true
+    },
+    {
+      "metric": "net_debt_ebitda",
+      "aequity": 0.8542417213640626,
+      "hand": 0.8542417213640626,
+      "finviz": null,
+      "ah_diff_pct": 0.0,
+      "af_diff_pct": null,
+      "hand_pass": "PASS",
+      "grade": "B+",
+      "grade_verified": true
+    },
+    {
+      "metric": "net_margin",
+      "aequity": 0.098529994,
+      "hand": 0.098529994,
+      "finviz": 0.09849999999999999,
+      "ah_diff_pct": 0.0,
+      "af_diff_pct": 0.030450761421325287,
+      "hand_pass": "PASS",
+      "grade": "B",
+      "grade_verified": true
+    },
+    {
+      "metric": "operating_margin",
+      "aequity": 0.13834,
+      "hand": 0.13834,
+      "finviz": 0.12539999999999998,
+      "ah_diff_pct": 0.0,
+      "af_diff_pct": 10.318979266347695,
+      "hand_pass": "PASS",
+      "grade": "B",
+      "grade_verified": true
+    },
+    {
+      "metric": "owner_earnings_yield",
+      "aequity": 0.09120428078451065,
+      "hand": 0.09120428078451065,
+      "finviz": null,
+      "ah_diff_pct": 0.0,
+      "af_diff_pct": null,
+      "hand_pass": "PASS",
+      "grade": "A",
+      "grade_verified": true
+    },
+    {
+      "metric": "pe_ratio",
+      "aequity": 9.113164,
+      "hand": 9.113164,
+      "finviz": 9.89,
+      "ah_diff_pct": 0.0,
+      "af_diff_pct": 7.854762386248748,
+      "hand_pass": "PASS",
+      "grade": "A",
+      "grade_verified": true
+    },
+    {
+      "metric": "peg_ratio",
+      "aequity": null,
+      "hand": null,
+      "finviz": null,
+      "ah_diff_pct": null,
+      "af_diff_pct": null,
+      "hand_pass": "N/A",
+      "grade": "INC",
+      "grade_verified": true
+    },
+    {
+      "metric": "price_to_book",
+      "aequity": 3.3034742,
+      "hand": 3.3034742,
+      "finviz": 3.4,
+      "ah_diff_pct": 0.0,
+      "af_diff_pct": 2.838994117647052,
+      "hand_pass": "PASS",
+      "grade": "B-",
+      "grade_verified": true
+    },
+    {
+      "metric": "revenue_growth",
+      "aequity": 0.021167874202347597,
+      "hand": 0.021167874202347597,
+      "finviz": null,
+      "ah_diff_pct": 0.0,
+      "af_diff_pct": null,
+      "hand_pass": "PASS",
+      "grade": "C",
+      "grade_verified": true
+    },
+    {
+      "metric": "roa",
+      "aequity": 0.13068,
+      "hand": 0.13068,
+      "finviz": 0.1576,
+      "ah_diff_pct": 0.0,
+      "af_diff_pct": 17.081218274111677,
+      "hand_pass": "PASS",
+      "grade": "A",
+      "grade_verified": true
+    },
+    {
+      "metric": "roce",
+      "aequity": 0.3147766453586117,
+      "hand": 0.3147766453586117,
+      "finviz": null,
+      "ah_diff_pct": 0.0,
+      "af_diff_pct": null,
+      "hand_pass": "PASS",
+      "grade": "A+",
+      "grade_verified": true
+    },
+    {
+      "metric": "roe",
+      "aequity": 0.35499,
+      "hand": 0.35499,
+      "finviz": 0.355,
+      "ah_diff_pct": 0.0,
+      "af_diff_pct": 0.0028169014084378848,
+      "hand_pass": "PASS",
+      "grade": "A+",
+      "grade_verified": true
+    },
+    {
+      "metric": "roic",
+      "aequity": 0.27964881316882295,
+      "hand": 0.27964881316882295,
+      "finviz": 0.20579999999999998,
+      "ah_diff_pct": 0.0,
+      "af_diff_pct": 35.883777049962575,
+      "hand_pass": "PASS",
+      "grade": "A",
+      "grade_verified": true
+    },
+    {
+      "metric": "roic_v2",
+      "aequity": 0.2386232718894009,
+      "hand": 0.2386232718894009,
+      "finviz": null,
+      "ah_diff_pct": 0.0,
+      "af_diff_pct": null,
+      "hand_pass": "PASS",
+      "grade": "A",
+      "grade_verified": true
+    }
+  ],
+  "dimension_verification": {
+    "dimensions": [
+      {
+        "dimension": "profitability",
+        "metrics": "roe, roic, net_margin",
+        "pipeline": "A",
+        "expected": "A",
+        "match": true
+      },
+      {
+        "dimension": "moat",
+        "metrics": "gross_margin, operating_margin",
+        "pipeline": "A-",
+        "expected": "A-",
+        "match": true
+      },
+      {
+        "dimension": "balance_sheet",
+        "metrics": "debt_to_equity, current_ratio",
+        "pipeline": "B-",
+        "expected": "B-",
+        "match": true
+      },
+      {
+        "dimension": "cash_flow",
+        "metrics": "fcf_yield, fcf_conversion",
+        "pipeline": "INC",
+        "expected": "INC",
+        "match": true
+      },
+      {
+        "dimension": "valuation",
+        "metrics": "pe_ratio, peg_ratio, earnings_yield",
+        "pipeline": "A",
+        "expected": "A",
+        "match": true
+      },
+      {
+        "dimension": "growth",
+        "metrics": "revenue_growth, eps_growth",
+        "pipeline": "C",
+        "expected": "C",
+        "match": true
+      },
+      {
+        "dimension": "management",
+        "metrics": "owner_earnings_yield",
+        "pipeline": "A",
+        "expected": "A",
+        "match": true
+      },
+      {
+        "dimension": "earnings_consistency",
+        "metrics": "earnings_growth (custom logic)",
+        "pipeline": "D",
+        "expected": "D",
+        "match": true
+      }
+    ],
+    "pipeline_overall": "B+",
+    "expected_overall": "B+",
+    "overall_match": true,
+    "all_dimensions_match": true
+  },
+  "raw_row_audit": {
+    "roic": {
+      "Operating Income (inc)": "$66.28M",
+      "Tax Provision (inc)": "$15.36M",
+      "Pretax Income (inc)": "$67.14M",
+      "Total Assets (bal)": "$289.96M",
+      "Current Liabilities (bal)": "$79.39M",
+      "Cash And Cash Equivalents (bal)": "$27.76M"
+    },
+    "fcf_conversion": {
+      "Free Cash Flow (cf)": "$27.77M",
+      "Net Income (inc)": "$51.78M"
+    },
+    "net_debt_ebitda": {
+      "Total Debt (bal)": "$97.00M",
+      "Cash And Cash Equivalents (bal)": "$27.76M",
+      "EBITDA source: EBITDA": "$81.05M"
+    },
+    "roce": {
+      "Operating Income (inc)": "$66.28M",
+      "Total Assets (bal)": "$289.96M",
+      "Current Liabilities (bal)": "$79.39M"
+    },
+    "current_ratio": {
+      "Current Assets (bal)": "$126.30M",
+      "Current Liabilities (bal)": "$79.39M"
+    },
+    "debt_to_equity": {
+      "Total Debt (bal)": "$97.00M",
+      "Stockholders Equity (bal)": "$139.08M"
+    },
+    "roic_v2": {
+      "Operating Income (inc)": "$66.28M",
+      "Total Debt (bal)": "$97.00M",
+      "Stockholders Equity (bal)": "$139.08M",
+      "Cash And Cash Equivalents (bal)": "$27.76M",
+      "Tax assumption": "25% flat rate"
+    },
+    "revenue_growth": {
+      "Total Revenue current (inc)": "$496.40M",
+      "Total Revenue prior (inc)": "$486.11M"
+    },
+    "eps_growth": {
+      "Basic EPS current (inc)": "$3.8100",
+      "Basic EPS prior (inc)": "$3.6800"
+    }
+  }
+}

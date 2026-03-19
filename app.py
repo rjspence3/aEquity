@@ -451,6 +451,30 @@ def _load_all_analyses() -> list[CompanyAnalysis]:
         return get_all_latest(conn)
 
 
+@st.cache_data(ttl=300)
+def _fetch_current_prices(tickers: tuple[str, ...]) -> dict[str, float]:
+    """Batch-fetch latest close prices via a single yfinance download call.
+
+    Uses a tuple parameter (not list) so Streamlit can hash it for caching.
+    Returns a dict of {ticker: price}; missing tickers are omitted.
+    """
+    if not tickers:
+        return {}
+    import yfinance as yf
+    data = yf.download(list(tickers), period="1d", progress=False, auto_adjust=True)
+    if data.empty:
+        return {}
+    close = data["Close"]
+    # Single-ticker download returns a Series; multi returns a DataFrame
+    if hasattr(close, "iloc"):
+        last_row = close.iloc[-1]
+        if hasattr(last_row, "to_dict"):
+            return {t: float(v) for t, v in last_row.to_dict().items() if v and not (isinstance(v, float) and v != v)}
+        # Series (single ticker)
+        return {tickers[0]: float(last_row)} if float(last_row) == float(last_row) else {}
+    return {}
+
+
 def _render_screener() -> None:
     st.subheader("🔍 Stock Screener")
     st.caption("Filter all analysed companies by score. Run `batch.py` to populate.")
@@ -460,6 +484,10 @@ def _render_screener() -> None:
     if not results:
         st.info("No analyses in the database yet. Run `python batch.py --limit 20` to get started.")
         return
+
+    all_tickers = tuple(r.ticker for r in results)
+    with st.spinner("Fetching current prices…"):
+        current_prices = _fetch_current_prices(all_tickers)
 
     # Build flat rows for the table
     rows = []
@@ -490,8 +518,25 @@ def _render_screener() -> None:
         }
         for short, full in _guru_col_map.items():
             row[short] = guru_map.get(full, 0)
+        price_now = current_prices.get(r.ticker)
+        vs_fv = (
+            round((price_now - fair_value) / fair_value * 100, 1)
+            if price_now and fair_value and fair_value > 0
+            else None
+        )
+        if vs_fv is None:
+            zone = "—"
+        elif vs_fv < 0:
+            zone = "🟢"   # price below fair value
+        elif vs_fv <= 20:
+            zone = "🟡"   # within 20% above fair value
+        else:
+            zone = "🔴"   # significantly overvalued
         row.update({
+            "Price": price_now,
             "Fair Value": fair_value,
+            "vs FV %": vs_fv,
+            "Zone": zone,
             "Must Buy": must_buy,
             "Confidence": r.confidence,
             "Partial": "⚠" if r.partial else "",
@@ -522,7 +567,10 @@ def _render_screener() -> None:
         for short in _guru_col_map
     }
     progress_cols["Overall"] = st.column_config.ProgressColumn("Overall", min_value=0, max_value=100)
+    progress_cols["Price"] = st.column_config.NumberColumn("Price", format="$%.2f")
     progress_cols["Fair Value"] = st.column_config.NumberColumn("Fair Value", format="$%.2f")
+    progress_cols["vs FV %"] = st.column_config.NumberColumn("vs FV %", format="%.1f%%")
+    progress_cols["Zone"] = st.column_config.TextColumn("Zone", help="🟢 below FV · 🟡 ≤20% above · 🔴 >20% above")
     progress_cols["Must Buy"] = st.column_config.NumberColumn("Must Buy", format="$%.2f")
     st.dataframe(filtered, use_container_width=True, hide_index=True, column_config=progress_cols)
 

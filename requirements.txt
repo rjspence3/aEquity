@@ -1,0 +1,9 @@
+anthropic==0.84.0
+yfinance==1.2.0
+sec-edgar-downloader==5.1.0
+pydantic==2.12.5
+pydantic-settings==2.13.1
+python-dotenv==1.2.2
+streamlit==1.54.0
+plotly==6.6.0
+lxml==6.0.2

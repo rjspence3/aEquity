@@ -221,31 +221,39 @@ def _render_analysis(result: CompanyAnalysis) -> None:
     pillar_map: dict[str, Any] = {p.pillar_name: p for p in result.pillars}
     pillar_order = ["The Engine", "The Moat", "The Fortress", "Alignment"]
 
-    for col, name in zip(cols, pillar_order, strict=False):
-        pillar = pillar_map.get(name)
-        if pillar:
-            with col:
-                st.plotly_chart(
-                    _gauge_chart(pillar.score, name),
-                    use_container_width=True,
-                    config={"displayModeBar": False},
-                )
+    if not result.pillars:
+        st.info("Pillar analysis unavailable — financial data could not be retrieved for this ticker.", icon="ℹ️")
+    else:
+        for col, name in zip(cols, pillar_order, strict=False):
+            pillar = pillar_map.get(name)
+            if pillar:
+                with col:
+                    st.plotly_chart(
+                        _gauge_chart(pillar.score, name),
+                        use_container_width=True,
+                        config={"displayModeBar": False},
+                    )
 
-    for name in pillar_order:
-        pillar = pillar_map.get(name)
-        if not pillar:
-            continue
-        with st.expander(f"{name} — {pillar.score}/100", expanded=False):
-            st.markdown(pillar.summary)
-            if pillar.red_flags:
-                for flag in pillar.red_flags:
-                    st.error(f"⚠ {flag}")
-            _render_metric_table(pillar.metrics)
+        for name in pillar_order:
+            pillar = pillar_map.get(name)
+            if not pillar:
+                continue
+            with st.expander(f"{name} — {pillar.score}/100", expanded=False):
+                st.markdown(pillar.summary)
+                if pillar.red_flags:
+                    for flag in pillar.red_flags:
+                        st.error(f"⚠ {flag}")
+                _render_metric_table(pillar.metrics)
 
     st.divider()
 
     # ── Guru Scorecards ────────────────────────────────────────────────────────
     st.subheader("🏛️ Virtual Investment Committee")
+
+    if not result.gurus:
+        st.info("Guru scorecards unavailable — analysis did not produce committee scores.", icon="ℹ️")
+        st.divider()
+        return
 
     guru_names: list[str] = [str(g.guru_name) for g in result.gurus]
     guru_scores = [g.score for g in result.gurus]
@@ -486,8 +494,12 @@ def _render_screener() -> None:
         return
 
     all_tickers = tuple(r.ticker for r in results)
+    current_prices: dict[str, float] = {}
     with st.spinner("Fetching current prices…"):
-        current_prices = _fetch_current_prices(all_tickers)
+        try:
+            current_prices = _fetch_current_prices(all_tickers)
+        except Exception:
+            st.warning("Could not fetch live prices — showing cached data only.", icon="⚠️")
 
     # Build flat rows for the table
     rows = []

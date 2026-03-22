@@ -72,3 +72,6 @@ output_*.json
 db/*.db-shm
 db/*.db-wal
 
+
+# SQLite databases
+db/*.db

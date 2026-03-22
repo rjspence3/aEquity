@@ -4,6 +4,8 @@ import html
 import logging
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from pathlib import Path
 
 from sec_edgar_downloader import Downloader
@@ -72,10 +74,21 @@ def fetch_10k_sections(
 
     downloader = Downloader("aEquity", email, _DOWNLOAD_DIR)
 
+    _EDGAR_TIMEOUT_SECS = 120
+
     for attempt in range(1, max_retries + 1):
         try:
-            downloader.get("10-K", ticker, limit=1)
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(downloader.get, "10-K", ticker, limit=1)
+                future.result(timeout=_EDGAR_TIMEOUT_SECS)
             break
+        except FuturesTimeoutError:
+            logger.error(
+                "EDGAR download timed out after %ds for %s (attempt %d/%d)",
+                _EDGAR_TIMEOUT_SECS, ticker, attempt, max_retries,
+            )
+            if attempt == max_retries:
+                return {"risk_factors": None, "mdna": None, "filing_date": None}
         except Exception as exc:
             wait = 2 ** attempt
             logger.warning(

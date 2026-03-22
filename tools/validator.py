@@ -2,7 +2,7 @@
 
 import re
 
-TICKER_PATTERN = re.compile(r"^[A-Z]{1,5}$")
+TICKER_PATTERN = re.compile(r"^[A-Z]{1,6}(\.[A-Z])?$")
 
 
 def validate_ticker(ticker: str) -> str:

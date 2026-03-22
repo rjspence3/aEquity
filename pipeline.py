@@ -20,9 +20,13 @@ from models import (
 )
 from scoring_config import (
     ALIGNMENT_WEIGHTS,
+    BUFFETT_WEIGHTS,
+    DAMODARAN_WEIGHTS,
     ENGINE_WEIGHTS,
     FORTRESS_WEIGHTS,
+    GRAHAM_WEIGHTS,
     HAIKU_MODEL,
+    LYNCH_WEIGHTS,
     SONNET_MODEL,
     VERDICT_AVOID,
     VERDICT_BUY,
@@ -267,12 +271,12 @@ def _score_buffett(
 ) -> int:
     components = []
     if roic is not None:
-        components.append((0.30, normalize_roic(roic)))
+        components.append((BUFFETT_WEIGHTS["roic"], normalize_roic(roic)))
     if fcf_conv is not None:
-        components.append((0.25, normalize_fcf_conversion(fcf_conv)))
-    components.append((0.25, moat_score))
+        components.append((BUFFETT_WEIGHTS["fcf_conv"], normalize_fcf_conversion(fcf_conv)))
+    components.append((BUFFETT_WEIGHTS["moat_score"], moat_score))
     if nd_ebitda is not None:
-        components.append((0.20, normalize_debt_ratio(nd_ebitda)))
+        components.append((BUFFETT_WEIGHTS["nd_ebitda"], normalize_debt_ratio(nd_ebitda)))
 
     if not components:
         return 50
@@ -288,11 +292,11 @@ def _score_lynch(
 ) -> int:
     components = []
     if peg is not None:
-        components.append((0.40, normalize_peg(peg)))
+        components.append((LYNCH_WEIGHTS["peg"], normalize_peg(peg)))
     if earnings_growth is not None:
         growth_score = max(0, min(100, int(earnings_growth / 0.15 * 100)))
-        components.append((0.30, growth_score))
-    components.append((0.30, understandability))
+        components.append((LYNCH_WEIGHTS["earnings_growth"], growth_score))
+    components.append((LYNCH_WEIGHTS["understandability"], understandability))
 
     if not components:
         return 50
@@ -308,12 +312,12 @@ def _score_graham(
 ) -> int:
     components = []
     if pb is not None:
-        components.append((0.35, normalize_price_to_book(pb)))
+        components.append((GRAHAM_WEIGHTS["pb"], normalize_price_to_book(pb)))
     if current_ratio is not None:
-        components.append((0.35, normalize_current_ratio(current_ratio)))
+        components.append((GRAHAM_WEIGHTS["current_ratio"], normalize_current_ratio(current_ratio)))
     if earnings_growth is not None:
         stability = 100 if earnings_growth > 0 else 0
-        components.append((0.30, stability))
+        components.append((GRAHAM_WEIGHTS["earnings_growth"], stability))
 
     if not components:
         return 50
@@ -334,11 +338,11 @@ def _score_damodaran(
     """
     components = []
     if roic is not None:
-        components.append((0.50, normalize_roic(roic)))
+        components.append((DAMODARAN_WEIGHTS["roic"], normalize_roic(roic)))
     if peg is not None:
-        components.append((0.30, normalize_peg(peg)))
+        components.append((DAMODARAN_WEIGHTS["peg"], normalize_peg(peg)))
     if nd_ebitda is not None:
-        components.append((0.20, normalize_debt_ratio(nd_ebitda)))
+        components.append((DAMODARAN_WEIGHTS["nd_ebitda"], normalize_debt_ratio(nd_ebitda)))
 
     if not components:
         return 50

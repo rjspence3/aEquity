@@ -13,4 +13,4 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: ruff check .
       - run: mypy --ignore-missing-imports .
-      - run: pytest tests/ --cov=. --cov-report=xml --tb=short
+      - run: pytest tests/ --cov=. --cov-report=xml --tb=short --cov-fail-under=70

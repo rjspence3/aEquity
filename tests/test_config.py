@@ -51,3 +51,22 @@ class TestSettings:
         assert "sec_api_key" not in field_names
         assert "sec_requests_per_second" not in field_names
         assert "llm_max_retries" not in field_names
+
+    def test_analyze_access_token_defaults_empty(self):
+        settings = Settings(_env_file=None)  # type: ignore[call-arg]
+        assert settings.analyze_access_token == ""
+
+    def test_analyze_access_token_read_from_env(self, monkeypatch):
+        monkeypatch.setenv("ANALYZE_ACCESS_TOKEN", "secret-token-123")
+        settings = Settings(_env_file=None)  # type: ignore[call-arg]
+        assert settings.analyze_access_token == "secret-token-123"
+
+    def test_analyze_access_token_gate_logic(self, monkeypatch):
+        # Gate is active when token is non-empty, inactive when empty.
+        monkeypatch.setenv("ANALYZE_ACCESS_TOKEN", "my-token")
+        settings_with_token = Settings(_env_file=None)  # type: ignore[call-arg]
+        assert bool(settings_with_token.analyze_access_token) is True
+
+        monkeypatch.delenv("ANALYZE_ACCESS_TOKEN", raising=False)
+        settings_without_token = Settings(_env_file=None)  # type: ignore[call-arg]
+        assert bool(settings_without_token.analyze_access_token) is False

@@ -1,11 +1,14 @@
 """Unit tests for SEC filing text extraction."""
 
+from concurrent.futures import TimeoutError as FuturesTimeoutError
+from unittest.mock import MagicMock, patch
 
 from tools.sec_tools import (
     _MDNA_PATTERN,
     _RISK_FACTORS_PATTERN,
     _extract_section,
     _strip_html_tags,
+    fetch_10k_sections,
 )
 
 
@@ -68,3 +71,43 @@ class TestSectionExtraction:
         # Should be truncated
         assert result is not None
         assert len(result) <= 200_000
+
+
+class TestFetch10kSectionsTimeout:
+    """Test that EDGAR download timeouts degrade gracefully."""
+
+    def test_timeout_returns_none_sections(self, monkeypatch):
+        """A FuturesTimeoutError on all retries should return None for both sections."""
+        monkeypatch.setenv("SEC_USER_AGENT_EMAIL", "test@example.com")
+
+        mock_future = MagicMock()
+        mock_future.result.side_effect = FuturesTimeoutError()
+
+        mock_executor = MagicMock()
+        mock_executor.__enter__ = MagicMock(return_value=mock_executor)
+        mock_executor.__exit__ = MagicMock(return_value=False)
+        mock_executor.submit.return_value = mock_future
+
+        with patch("tools.sec_tools.ThreadPoolExecutor", return_value=mock_executor):
+            result = fetch_10k_sections("AAPL", max_retries=1)
+
+        assert result["risk_factors"] is None
+        assert result["mdna"] is None
+        assert result.get("filing_date") is None
+
+    def test_timeout_retries_before_giving_up(self, monkeypatch):
+        """With max_retries=3 and all timeouts, executor.submit is called 3 times."""
+        monkeypatch.setenv("SEC_USER_AGENT_EMAIL", "test@example.com")
+
+        mock_future = MagicMock()
+        mock_future.result.side_effect = FuturesTimeoutError()
+
+        mock_executor = MagicMock()
+        mock_executor.__enter__ = MagicMock(return_value=mock_executor)
+        mock_executor.__exit__ = MagicMock(return_value=False)
+        mock_executor.submit.return_value = mock_future
+
+        with patch("tools.sec_tools.ThreadPoolExecutor", return_value=mock_executor):
+            fetch_10k_sections("MSFT", max_retries=3)
+
+        assert mock_executor.submit.call_count == 3

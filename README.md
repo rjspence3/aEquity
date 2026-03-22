@@ -75,6 +75,14 @@ Each stock is scored from the perspective of four legendary investors:
 
 All tunable constants (weights, normalization ranges, model IDs, verdict boundaries) live in `scoring_config.py`. See `.env.example` for environment variables.
 
+## Deployment (Railway)
+
+The app is deployed on Railway. Each analysis triggers real Anthropic API calls (~$0.05–0.20 each). To prevent unbounded spend on the public URL, set `ANALYZE_ACCESS_TOKEN` in Railway → Variables. When set, the Analyze tab requires the token before any analysis can run. The Screener and Watchlist tabs remain public (they read from the pre-populated DB, no API calls).
+
+```
+ANALYZE_ACCESS_TOKEN=your-secret-token   # set in Railway Variables, not in .env
+```
+
 ## Development
 
 ```bash

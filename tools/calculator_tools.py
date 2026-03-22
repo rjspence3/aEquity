@@ -709,7 +709,8 @@ def build_alignment_metrics(stock: yf.Ticker) -> list[MetricDrillDown]:
 
         dividend_yield = float(info.get("dividendYield") or 0.0)
         # yfinance does not provide buyback yield directly; shareholder yield is dividend-only.
-        # TODO: derive buyback yield from repurchaseOfStock in the cashflow statement.
+        # Buyback yield would require summing repurchaseOfStock from the cashflow statement,
+        # which yfinance exposes inconsistently across tickers.
         shareholder_yield = dividend_yield
         if shareholder_yield > 0:
             score = max(0, min(100, int(shareholder_yield * 1000)))

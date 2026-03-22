@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     sec_user_agent_email: str = ""
     database_url: str = "sqlite:///./db/aequity.db"
     log_level: str = "INFO"
+    # When set, the Analyze tab requires this token before running analyses.
+    # Prevents unbounded API spend on the public Railway deployment.
+    # Leave empty to rely on the session-state rate limiter only (local dev).
+    analyze_access_token: str = ""
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

@@ -35,7 +35,17 @@ class TestValidateTicker:
 
     def test_special_chars_raise(self):
         with pytest.raises(ValueError, match="Invalid ticker"):
-            validate_ticker("A.B")
+            validate_ticker("A.1")  # digit after dot is invalid
+
+    def test_dot_suffix_valid(self):
+        assert validate_ticker("BRK.A") == "BRK.A"
+
+    def test_dot_suffix_lowercase_normalized(self):
+        assert validate_ticker("brk.a") == "BRK.A"
+
+    def test_double_dot_suffix_raises(self):
+        with pytest.raises(ValueError, match="Invalid ticker"):
+            validate_ticker("BRK.AB")  # two letters after dot is invalid
 
 
 class TestValidateBatch:

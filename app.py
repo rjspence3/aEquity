@@ -973,72 +973,89 @@ def main() -> None:
     )
 
     with tab_analyze:
-        col_input, col_btn = st.columns([3, 1])
-        with col_input:
-            ticker_input = st.text_input(
-                "Ticker Symbol",
-                value=st.session_state.get("last_ticker", "AAPL"),
-                placeholder="e.g. AAPL",
-                label_visibility="collapsed",
-            ).upper().strip()
-        with col_btn:
-            run_clicked = st.button("▶ Run Analysis", type="primary", use_container_width=True)
+        # ── Access token gate ────────────────────────────────────────────────
+        # If ANALYZE_ACCESS_TOKEN is set in the environment, require the user
+        # to enter it once per session before analyses can run. This prevents
+        # unbounded API spend when the app is deployed publicly on Railway.
+        _token_required = bool(settings.analyze_access_token)
+        _token_granted = st.session_state.get("access_granted", False)
 
-        ticker_valid = True
-        try:
-            if ticker_input:
-                validate_ticker(ticker_input)
-        except ValueError:
-            st.error(f"Invalid ticker: '{ticker_input}' — must be 1-5 uppercase letters.")
-            ticker_valid = False
-
-        if run_clicked and ticker_valid and ticker_input:
-            if not _check_rate_limit():
-                st.error("Rate limit reached: max 20 analyses per hour.")
-            else:
-                st.session_state["last_ticker"] = ticker_input
-                with st.spinner(f"Analyzing {ticker_input}…"):
-                    start = time.time()
-                    try:
-                        result = analyze_ticker(ticker_input)
-                        st.session_state["analysis_result"] = result
-                        elapsed = time.time() - start
-                        st.success(f"Analysis complete in {elapsed:.1f}s")
-                    except ValueError:
-                        st.error("Invalid ticker or data unavailable for this symbol.")
-                        st.session_state.pop("analysis_result", None)
-                    except anthropic.AuthenticationError:
-                        st.error("API key error — check that ANTHROPIC_API_KEY is set correctly.")
-                        st.session_state.pop("analysis_result", None)
-                    except anthropic.RateLimitError:
-                        st.error("Rate limit reached. Wait a moment and try again.")
-                        st.session_state.pop("analysis_result", None)
-                    except Exception as exc:
-                        logger.error(
-                            "Unexpected error analyzing %s: %s", ticker_input, exc, exc_info=True
-                        )
-                        st.error("Unexpected error. Check logs for details.")
-                        st.session_state.pop("analysis_result", None)
-
-        cached: CompanyAnalysis | None = st.session_state.get("analysis_result")
-        if cached:
-            _render_analysis(cached)
+        if _token_required and not _token_granted:
+            st.info("This demo requires an access token to run analyses.")
+            entered_token = st.text_input("Access token", type="password", key="token_input")
+            if st.button("Unlock", key="token_submit"):
+                if entered_token == settings.analyze_access_token:
+                    st.session_state["access_granted"] = True
+                    st.rerun()
+                else:
+                    st.error("Invalid access token.")
         else:
-            st.info("Enter a ticker symbol and click **Run Analysis** to begin.")
-            with st.expander("ℹ️ How it works", expanded=True):
-                st.markdown("""
-                **aEquity** analyzes stocks through four lenses:
+            col_input, col_btn = st.columns([3, 1])
+            with col_input:
+                ticker_input = st.text_input(
+                    "Ticker Symbol",
+                    value=st.session_state.get("last_ticker", "AAPL"),
+                    placeholder="e.g. AAPL",
+                    label_visibility="collapsed",
+                ).upper().strip()
+            with col_btn:
+                run_clicked = st.button("▶ Run Analysis", type="primary", use_container_width=True)
 
-                | Pillar | What it measures |
-                |--------|-----------------|
-                | 🔧 **The Engine** | Business quality (ROIC, margins) |
-                | 🏰 **The Moat** | Competitive defensibility (text analysis) |
-                | 🏦 **The Fortress** | Financial health (debt, FCF) |
-                | 🤝 **Alignment** | Governance (insider ownership, capital returns) |
+            ticker_valid = True
+            try:
+                if ticker_input:
+                    validate_ticker(ticker_input)
+            except ValueError:
+                st.error(f"Invalid ticker: '{ticker_input}' — use 1–6 uppercase letters, optionally with a dot suffix (e.g. BRK.A).")
+                ticker_valid = False
 
-                The **Virtual Investment Committee** applies Buffett, Lynch, Graham, and Damodaran
-                scoring formulas using your company's actual financial data.
-                """)
+            if run_clicked and ticker_valid and ticker_input:
+                if not _check_rate_limit():
+                    st.error("Rate limit reached: max 20 analyses per hour.")
+                else:
+                    st.session_state["last_ticker"] = ticker_input
+                    with st.spinner(f"Analyzing {ticker_input}…"):
+                        start = time.time()
+                        try:
+                            result = analyze_ticker(ticker_input)
+                            st.session_state["analysis_result"] = result
+                            elapsed = time.time() - start
+                            st.success(f"Analysis complete in {elapsed:.1f}s")
+                        except ValueError:
+                            st.error("Invalid ticker or data unavailable for this symbol.")
+                            st.session_state.pop("analysis_result", None)
+                        except anthropic.AuthenticationError:
+                            st.error("API key error — check that ANTHROPIC_API_KEY is set correctly.")
+                            st.session_state.pop("analysis_result", None)
+                        except anthropic.RateLimitError:
+                            st.error("Rate limit reached. Wait a moment and try again.")
+                            st.session_state.pop("analysis_result", None)
+                        except Exception as exc:
+                            logger.error(
+                                "Unexpected error analyzing %s: %s", ticker_input, exc, exc_info=True
+                            )
+                            st.error("Unexpected error. Check logs for details.")
+                            st.session_state.pop("analysis_result", None)
+
+            cached: CompanyAnalysis | None = st.session_state.get("analysis_result")
+            if cached:
+                _render_analysis(cached)
+            else:
+                st.info("Enter a ticker symbol and click **Run Analysis** to begin.")
+                with st.expander("ℹ️ How it works", expanded=True):
+                    st.markdown("""
+                    **aEquity** analyzes stocks through four lenses:
+
+                    | Pillar | What it measures |
+                    |--------|-----------------|
+                    | 🔧 **The Engine** | Business quality (ROIC, margins) |
+                    | 🏰 **The Moat** | Competitive defensibility (text analysis) |
+                    | 🏦 **The Fortress** | Financial health (debt, FCF) |
+                    | 🤝 **Alignment** | Governance (insider ownership, capital returns) |
+
+                    The **Virtual Investment Committee** applies Buffett, Lynch, Graham, and Damodaran
+                    scoring formulas using your company's actual financial data.
+                    """)
 
     with tab_screener:
         _render_screener()

@@ -1,6 +1,0 @@
-ticker,run1_moat,run2_moat,run3_moat,moat_stddev,moat_mean,run1_understand,run2_understand,run3_understand,understand_stddev,understand_mean,run1_composite,run2_composite,run3_composite,composite_stddev,composite_mean,flagged
-AAPL,85,0,85,40.1,56.7,90,0,90,42.4,60.0,77,60,77,8.0,71.3,True
-MSFT,82,85,85,1.4,84.0,75,75,75,0.0,75.0,76,76,76,0.0,76.0,False
-XOM,72,65,65,3.3,67.3,75,75,75,0.0,75.0,35,34,34,0.5,34.3,False
-WMT,78,75,75,1.4,76.0,92,95,90,2.1,92.3,43,43,42,0.5,42.7,False
-TSLA,72,72,72,0.0,72.0,82,75,85,4.2,80.7,41,40,42,0.8,41.0,False

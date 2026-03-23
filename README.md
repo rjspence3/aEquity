@@ -1,5 +1,7 @@
 # aEquity — Autonomous Equity Analyst
 
+🔗 [Live Demo](https://aequity-production.up.railway.app)
+
 aEquity analyzes S&P 500 stocks through four guru-driven lenses: business quality, competitive moat, financial health, and governance. It combines quantitative metrics from yfinance, qualitative signals from SEC 10-K filings, and Claude LLM scoring into a 0–100 scorecard.
 
 ## Prerequisites

@@ -75,3 +75,17 @@ db/*.db-wal
 
 # SQLite databases
 db/*.db
+
+# Corrupted pip output files
+=*
+
+# Internal/dev-only docs
+AUDIT_*.md
+HANDOFF-*.md
+CLAUDE.md
+docs/Plan.md
+.claude/
+
+# Validation generated artifacts
+validation/output/*.csv
+validation/output/*.png

@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 # ── Page config ───────────────────────────────────────────────────────────────
 
 st.set_page_config(
-    page_title="aEquity — Autonomous Equity Analyst",
+    page_title="aEquity",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="collapsed",

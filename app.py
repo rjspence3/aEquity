@@ -196,7 +196,6 @@ def _render_analysis(result: CompanyAnalysis) -> None:
     with col_score:
         st.metric("Overall Score", f"{result.overall_score}/100")
     with col_grade:
-        grade_display = result.overall_grade or "—"
         st.caption("Grade")
         if result.overall_grade:
             st.markdown(_grade_badge_html(result.overall_grade), unsafe_allow_html=True)
@@ -222,7 +221,10 @@ def _render_analysis(result: CompanyAnalysis) -> None:
     pillar_order = ["The Engine", "The Moat", "The Fortress", "Alignment"]
 
     if not result.pillars:
-        st.info("Pillar analysis unavailable — financial data could not be retrieved for this ticker.", icon="ℹ️")
+        st.info(
+            "Pillar analysis unavailable — financial data could not be retrieved for this ticker.",
+            icon="ℹ️",
+        )
     else:
         for col, name in zip(cols, pillar_order, strict=False):
             pillar = pillar_map.get(name)
@@ -251,7 +253,10 @@ def _render_analysis(result: CompanyAnalysis) -> None:
     st.subheader("🏛️ Virtual Investment Committee")
 
     if not result.gurus:
-        st.info("Guru scorecards unavailable — analysis did not produce committee scores.", icon="ℹ️")
+        st.info(
+            "Guru scorecards unavailable — analysis did not produce committee scores.",
+            icon="ℹ️",
+        )
         st.divider()
         return
 
@@ -303,12 +308,13 @@ def _render_analysis(result: CompanyAnalysis) -> None:
                 ("Fair Value", "fair_value", "#FFE66D", "#2D2D00"),
                 ("Overvalued", "overvalued", "#FF6B6B", "#2D0000"),
             ]
-            for col, (label, key, color, text_color) in zip(zone_cols, zone_defs):
+            for col, (label, key, color, text_color) in zip(zone_cols, zone_defs, strict=False):
                 with col:
                     st.markdown(
                         f"<div style='background:{color};padding:8px;border-radius:6px;"
                         f"text-align:center'><b style='color:{text_color}'>{label}</b><br>"
-                        f"<span style='color:{text_color};font-size:1.1em'>${zones[key]:.2f}</span></div>",
+                        f"<span style='color:{text_color};font-size:1.1em'>"
+                        f"${zones[key]:.2f}</span></div>",
                         unsafe_allow_html=True,
                     )
 
@@ -325,7 +331,7 @@ def _render_analysis(result: CompanyAnalysis) -> None:
             st.divider()
             st.subheader("📐 Entry Prices by Guru")
 
-            _GURU_LABELS = {
+            _guru_labels = {
                 "buffett": "Warren Buffett",
                 "munger": "Charlie Munger",
                 "lynch": "Peter Lynch",
@@ -336,7 +342,6 @@ def _render_analysis(result: CompanyAnalysis) -> None:
                 "smith": "Terry Smith",
             }
 
-            current_price = result.price_targets.get("composite", {}) and None
             # Extract current price from composite methods or from the by_guru pct_away
             # (we reconstruct it from target + pct_away to avoid passing it separately)
             current_price_display: float | None = None
@@ -349,7 +354,7 @@ def _render_analysis(result: CompanyAnalysis) -> None:
 
             # Sort: in-zone first, then by pct_away ascending, None last
             rows = []
-            for key, label in _GURU_LABELS.items():
+            for key, label in _guru_labels.items():
                 entry = by_guru.get(key, {})
                 target = entry.get("target")
                 pct_away = entry.get("pct_away")
@@ -384,8 +389,10 @@ def _render_analysis(result: CompanyAnalysis) -> None:
                 table_rows_html += (
                     f"<tr style='background:{row_bg}'>"
                     f"<td style='padding:6px 10px'>{label}</td>"
-                    f"<td style='padding:6px 10px;text-align:right;font-family:monospace'>{target_str}</td>"
-                    f"<td style='padding:6px 10px;text-align:right;font-family:monospace'>{pct_str}</td>"
+                    f"<td style='padding:6px 10px;text-align:right;"
+                    f"font-family:monospace'>{target_str}</td>"
+                    f"<td style='padding:6px 10px;text-align:right;"
+                    f"font-family:monospace'>{pct_str}</td>"
                     f"<td style='padding:6px 10px;text-align:center'>{status_str}</td>"
                     f"</tr>"
                 )
@@ -401,7 +408,9 @@ def _render_analysis(result: CompanyAnalysis) -> None:
                 unsafe_allow_html=True,
             )
             if current_price_display:
-                st.caption(f"Current price used for % calculations: **${current_price_display:.2f}**")
+                st.caption(
+                    f"Current price used for % calculations: **${current_price_display:.2f}**"
+                )
 
         # Add to watchlist button
         st.divider()
@@ -412,7 +421,7 @@ def _render_analysis(result: CompanyAnalysis) -> None:
         if wl_item is None:
             if st.button("+ Add to Watchlist", key="add_watchlist"):
                 with open_db(settings.database_url) as conn:
-                    wl = add_to_watchlist(conn, result.ticker, result.company_name)
+                    add_to_watchlist(conn, result.ticker, result.company_name)
                     update_price_targets(
                         conn, result.ticker,
                         must_buy=zones["must_buy"],
@@ -477,7 +486,11 @@ def _fetch_current_prices(tickers: tuple[str, ...]) -> dict[str, float]:
     if hasattr(close, "iloc"):
         last_row = close.iloc[-1]
         if hasattr(last_row, "to_dict"):
-            return {t: float(v) for t, v in last_row.to_dict().items() if v and not (isinstance(v, float) and v != v)}
+            return {
+                t: float(v)
+                for t, v in last_row.to_dict().items()
+                if v and not (isinstance(v, float) and v != v)
+            }
         # Series (single ticker)
         return {tickers[0]: float(last_row)} if float(last_row) == float(last_row) else {}
     return {}
@@ -578,11 +591,15 @@ def _render_screener() -> None:
         short: st.column_config.ProgressColumn(short, min_value=0, max_value=100)
         for short in _guru_col_map
     }
-    progress_cols["Overall"] = st.column_config.ProgressColumn("Overall", min_value=0, max_value=100)
+    progress_cols["Overall"] = st.column_config.ProgressColumn(
+        "Overall", min_value=0, max_value=100
+    )
     progress_cols["Price"] = st.column_config.NumberColumn("Price", format="$%.2f")
     progress_cols["Fair Value"] = st.column_config.NumberColumn("Fair Value", format="$%.2f")
     progress_cols["vs FV %"] = st.column_config.NumberColumn("vs FV %", format="%.1f%%")
-    progress_cols["Zone"] = st.column_config.TextColumn("Zone", help="🟢 below FV · 🟡 ≤20% above · 🔴 >20% above")
+    progress_cols["Zone"] = st.column_config.TextColumn(
+        "Zone", help="🟢 below FV · 🟡 ≤20% above · 🔴 >20% above"
+    )
     progress_cols["Must Buy"] = st.column_config.NumberColumn("Must Buy", format="$%.2f")
     st.dataframe(filtered, use_container_width=True, hide_index=True, column_config=progress_cols)
 
@@ -614,7 +631,9 @@ def _render_screener() -> None:
                             add_to_watchlist(conn, ticker, name_map.get(ticker, ""))
                             added += 1
                 if added:
-                    st.success(f"Added {added} stocks to watchlist (screening). {skipped} already present.")
+                    st.success(
+                        f"Added {added} stocks to watchlist (screening). {skipped} already present."
+                    )
                 else:
                     st.info(f"All {skipped} selected stocks are already on the watchlist.")
 
@@ -1019,7 +1038,10 @@ def main() -> None:
                 if ticker_input:
                     validate_ticker(ticker_input)
             except ValueError:
-                st.error(f"Invalid ticker: '{ticker_input}' — use 1–6 uppercase letters, optionally with a dot suffix (e.g. BRK.A).")
+                st.error(
+                    f"Invalid ticker: '{ticker_input}' — use 1–6 uppercase letters,"
+                    " optionally with a dot suffix (e.g. BRK.A)."
+                )
                 ticker_valid = False
 
             if run_clicked and ticker_valid and ticker_input:
@@ -1038,14 +1060,17 @@ def main() -> None:
                             st.error("Invalid ticker or data unavailable for this symbol.")
                             st.session_state.pop("analysis_result", None)
                         except anthropic.AuthenticationError:
-                            st.error("API key error — check that ANTHROPIC_API_KEY is set correctly.")
+                            st.error(
+                                "API key error — check that ANTHROPIC_API_KEY is set correctly."
+                            )
                             st.session_state.pop("analysis_result", None)
                         except anthropic.RateLimitError:
                             st.error("Rate limit reached. Wait a moment and try again.")
                             st.session_state.pop("analysis_result", None)
                         except Exception as exc:
                             logger.error(
-                                "Unexpected error analyzing %s: %s", ticker_input, exc, exc_info=True
+                                "Unexpected error analyzing %s: %s",
+                                ticker_input, exc, exc_info=True,
                             )
                             st.error("Unexpected error. Check logs for details.")
                             st.session_state.pop("analysis_result", None)
@@ -1066,8 +1091,8 @@ def main() -> None:
                     | 🏦 **The Fortress** | Financial health (debt, FCF) |
                     | 🤝 **Alignment** | Governance (insider ownership, capital returns) |
 
-                    The **Virtual Investment Committee** applies Buffett, Lynch, Graham, and Damodaran
-                    scoring formulas using your company's actual financial data.
+                    The **Virtual Investment Committee** applies Buffett, Lynch, Graham, and
+                    Damodaran scoring formulas using your company's actual financial data.
                     """)
 
     with tab_screener:

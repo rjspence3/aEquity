@@ -973,12 +973,13 @@ def main() -> None:
     </style>
     """, unsafe_allow_html=True)
 
+    st.sidebar.caption("⚠️ Personal project — not investing advice.")
+
     st.markdown("## 📈 aEquity — Autonomous Equity Analyst")
     st.caption(
         "Decision-grade intelligence from 10-Ks, financial data,"
         " and the Virtual Investment Committee."
     )
-    st.info("⚠️ This is a personal project built for fun. Nothing here is investing advice.", icon=None)
 
     tab_analyze, tab_screener, tab_watchlist, tab_radar = st.tabs(
         ["Analyze", "Screener", "Watchlist", "Macro Radar"]

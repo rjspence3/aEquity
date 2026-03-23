@@ -68,13 +68,10 @@ filings_cache/
 # Analysis outputs
 output_*.json
 
-# SQLite database WAL/SHM temp files (db itself is committed)
+# SQLite database (committed to seed Railway demo data)
+# WAL/SHM are temp files — never commit those
 db/*.db-shm
 db/*.db-wal
-
-
-# SQLite databases
-db/*.db
 
 # Corrupted pip output files
 =*

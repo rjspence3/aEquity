@@ -1091,8 +1091,7 @@ def main() -> None:
                     | 🏦 **The Fortress** | Financial health (debt, FCF) |
                     | 🤝 **Alignment** | Governance (insider ownership, capital returns) |
 
-                    The **Virtual Investment Committee** applies Buffett, Lynch, Graham, and
-                    Damodaran scoring formulas using your company's actual financial data.
+                    The **Virtual Investment Committee** applies 8 investing experts — Buffett, Lynch, Graham, Damodaran, Munger, Greenblatt, Marks, and Smith — scoring formulas using your company's actual financial data.
                     """)
 
     with tab_screener:

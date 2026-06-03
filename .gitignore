@@ -86,3 +86,5 @@ docs/Plan.md
 # Validation generated artifacts
 validation/output/*.csv
 validation/output/*.png
+
+*.db

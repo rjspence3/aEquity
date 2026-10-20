@@ -88,3 +88,4 @@ validation/output/*.csv
 validation/output/*.png
 
 *.db
+.claude/hooks-state/
